@@ -1,3 +1,6 @@
+#ifndef EXPRESSION_H
+#define EXPRESSION_H
+
 typedef enum {
     NODE_ASSIGNMENT,
     NODE_BINARY_OP,
@@ -44,3 +47,5 @@ typedef struct {
     ASTNode base;
     ASTNodeData data;
 } ASTNodeWrapper;
+
+#endif // EXPRESSION_H
