@@ -6,7 +6,7 @@
 
 // <VarDeclaration> ::= VAR <IdentifierList> ;
 
-<ProcDeclaration> ::= {Type <Identifier> '(' ')' '{' <Block> '}'} 
+<ProcDeclaration> ::= {<Type> <Identifier> '(' ')' '{' <Block> '}'} 
 
 <AssignmentStatement> ::= <Identifier> '=' <Expression>                  
 
@@ -16,7 +16,7 @@
 
 <Statement> ::= [ <AssignmentStatement> | <CallStatement> | <CompoundStatement> | <IfStatement> | <WhileStatement> | <DeclareStatment> ]  |  <ReadStatement> | <WriteStatement>            
 
-<DeclareStatment> ::= Type <Identifier> ['=' Expression]
+<DeclareStatment> ::= <Type> <Identifier> ['=' Expression]
 
 <IfStatement> ::= 'if' '(' <Condition> ')' '{' <Statement> '}'
 
