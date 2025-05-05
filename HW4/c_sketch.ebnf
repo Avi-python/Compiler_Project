@@ -1,0 +1,49 @@
+<Program> ::= <ProgramHead> <Block>.
+
+<Block> ::= [<ConstDeclaration>] [<VarDeclaration>] [<ProcDeclaration>] 'int' 'main' '(' ')' <CompoundStatement>
+
+// <ConstDeclaration> ::= CONST <Identifier> = <String> {,<Identifier>=<String>};        
+
+// <VarDeclaration> ::= VAR <IdentifierList> ;
+
+<ProcDeclaration> ::= {Type <Identifier> '(' ')' '{' <Block> '}'} 
+
+<AssignmentStatement> ::= <Identifier> '=' <Expression>                  
+
+<CallStatement> ::= <Identifier> '(' ')'
+
+<CompoundStatement> ::= '{' <Statement>{;<Statement>} '}'
+
+<Statement> ::= [ <AssignmentStatement> | <CallStatement> | <CompoundStatement> | <IfStatement> | <WhileStatement> | <DeclareStatment> ]  |  <ReadStatement> | <WriteStatement>            
+
+<DeclareStatment> ::= Type <Identifier> ['=' Expression]
+
+<IfStatement> ::= 'if' '(' <Condition> ')' '{' <Statement> '}'
+
+<WhileStatement> ::= 'while' '(' <Condition> ')' '{' <CompoundStatement> '}'
+
+<ReadStatement> ::= READ ( <IdentifierList> )    
+
+<WriteStatement> ::= WRITE ( <IdentifierList> )
+
+<IdentifierList> ::= <Identifier> { , <Identifier> } 
+
+<Condition> ::= <Expression> \<|<=|==|!=|>|>=\ <Expression>                 
+
+<Expression> ::= [+|-] <Term> { \+|-\ <Term> } // TODO 要處理 Unary 的狀況，或是說可以先無視
+
+<Term> :: = <Factor> { \ *|/ \ <Factor> }             
+
+<Factor> ::= <Identifier> | <Number> | (<Expression>)                      
+
+<Identifier> ::= <Alpha> { <Alpha> | <Digit> }        
+
+<Number> ::= <Digit> { <Digit> }                    
+
+<Alpha> ::= A|B|C|D|E|F|G|H|I|J|K|L|M|N|O|P|Q|R|S|T|U|V|W|X|Y|Z|a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z
+
+<Digit> ::= 0|1|2|3|4|5|6|7|8|9                  
+
+<String> ::= " 任何非雙引號的字元集合 " 
+
+<Type> ::= 'int'
