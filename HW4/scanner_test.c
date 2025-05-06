@@ -13,6 +13,7 @@ extern char *yytext; // Matched text
 extern int yyleng;   // Length of matched text
 extern int lineno;   // Current line number (from your scanner.l)
 extern int column;   // Current column number (from your scanner.l)
+extern char current_line_buffer[1024];
 
 // yylval is used by the lexer to return token values.
 // It must be defined in the program that uses the lexer.
@@ -20,8 +21,12 @@ YYSTYPE yylval;
 
 void yyerror(const char *s)
 {
-    fprintf(stderr, "%d:%d error: %s \n%d | %s\n", 
-            lineno, column - yyleng, s, lineno, yytext);
+    fprintf(stderr, "%d:%d error: %s\n", lineno, column - yyleng, s);
+    fprintf(stderr, "%d | %s\n", lineno, current_line_buffer);
+    for(size_t i = 0; i < column - yyleng; i++) {
+        fprintf(stderr, " ");
+    }
+    fprintf(stderr, "^--\n");
 }
 
 // Helper function to convert token numeric codes to readable names
