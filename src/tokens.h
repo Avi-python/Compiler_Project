@@ -17,6 +17,11 @@
 #define INT            14
 #define CHAR           15
 #define RETURN         16
+#define IF             17
+#define ELSE           18
+#define DO             19
+#define WHILE          20
+#define CONST          21
 
 typedef union {
     int ival;

@@ -1,0 +1,19 @@
+%compare-strncmp
+
+%{
+#include <string.h> // Needed for strcmp
+#include "tokens.h"
+%}
+
+struct resword { char *name; int type; };
+
+%%
+int, INT
+char, CHAR
+return, RETURN
+if, IF
+else, ELSE
+do, DO
+while, WHILE
+const, CONST
+%%

@@ -113,7 +113,7 @@ int main(int argc, char **argv) {
                 break;
             default:
                 // This case handles any tokens not explicitly listed above
-                printf("Code: %-14d |\n", token);
+                printf("%-14s |\n", yytext);
                 break;
         }
     }

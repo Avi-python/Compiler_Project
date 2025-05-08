@@ -1,0 +1,16 @@
+# Build output
+build/
+src/lex.yy.c
+src/scanner_test
+*.o
+
+# Editor/IDE specific
+*.swp
+*~
+.DS_Store
+
+# vscode
+.vscode
+
+# Other generated files
+# If you have other generated files, add them here

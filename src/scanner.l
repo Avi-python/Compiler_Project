@@ -1,7 +1,8 @@
 %{
+#include <string.h> // Required for strdup if yylval is char* and you copy yytext
 #include "tokens.h"
 #include "error.h"
-#include <string.h> // Required for strdup if yylval is char* and you copy yytext
+#include "reswords.h"
 
 extern void yyerror(const char *s); 
 
@@ -38,7 +39,19 @@ character   \'([^'])\'
 "{"             { column += yyleng; return LBRACE; }
 "}"             { column += yyleng; return RBRACE; }
 ";"             { column += yyleng; return SEMI; }
-{identifier}    { yylval.sval = strdup(yytext); column += yyleng; return IDENTIFIER; } // Assuming yylval.sval is char*
+
+{identifier}    { 
+    column += yyleng; 
+    struct resword* res = is_resword(yytext, yyleng);
+    if(res != NULL)
+    {
+        yylval.sval = strdup(yytext);
+        return res->type;
+    }
+    yylval.sval = strdup(yytext); 
+    return IDENTIFIER; 
+} 
+
 {number}        { yylval.ival = atoi(yytext); column += yyleng; return NUMBER; } // Assuming yylval.ival is int
 {character}     { yylval.sval = strdup(yytext); column += yyleng; ; return CHAR; } // Assuming yylval.sval is char* for the literal string
 .               { save_error_pos("unexpected character", yytext); column += yyleng;  /* Stilcolumn += yyleng; */ }
