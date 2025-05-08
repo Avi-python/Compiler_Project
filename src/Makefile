@@ -20,7 +20,7 @@ LEX_C_FILE = lex.yy.c
 # Header files - list all headers that, if changed, should trigger a rebuild.
 # scanner.l includes tokens.h and resword.h
 # scanner_test.c includes tokens.h
-HEADERS = tokens.h resword.h
+HEADERS = tokens.h
 
 # Default target: build the executable
 all: $(TARGET)

@@ -1,3 +1,6 @@
+#ifndef TOKENS_H
+#define TOKENS_H
+
 #define error           1
 #define IDENTIFIER      2
 #define NUMBER          3
@@ -23,3 +26,5 @@ typedef union {
 // Extern declaration for yylval, so scanner_test.c and parser.c can use it
 // The actual definition (YYSTYPE yylval;) will be in scanner_test.c and your parser.c
 extern YYSTYPE yylval; 
+
+#endif // TOKENS_H
