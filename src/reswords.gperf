@@ -2,10 +2,10 @@
 
 %{
 #include <string.h> // Needed for strcmp
-#include "tokens.h"
+#include "parser.tab.h"
 %}
 
-struct resword { char *name; int type; };
+struct resword { char *name; yytoken_kind_t type; };
 
 %%
 int, INT

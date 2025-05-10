@@ -4,7 +4,7 @@ Grammar::Syntactic::ANSI-C
 
 top-level	::= { top-level-elem | comment }
 
-top-level-elem	::= decl-stmt | fn-definition
+top-level-elem	::= decl-stmt | fun-definition
 
 +Syntax::Functions
 

@@ -1,5 +1,5 @@
 /* ANSI-C code produced by gperf version 3.1 */
-/* Command-line: gperf -S 1 -t -P -N is_resword -c reswords.gperf  */
+/* Command-line: gperf -S 1 -C -c -P -t -N is_resword reswords.gperf  */
 /* Computed positions: -k'1' */
 
 #if !((' ' == 32) && ('!' == 33) && ('"' == 34) && ('#' == 35) \
@@ -32,9 +32,9 @@
 #line 3 "reswords.gperf"
 
 #include <string.h> // Needed for strcmp
-#include "tokens.h"
+#include "parser.tab.h"
 #line 8 "reswords.gperf"
-struct resword { const char *name; int type; };
+struct resword { char *name; yytoken_kind_t type; };
 
 #define TOTAL_KEYWORDS 8
 #define MIN_WORD_LENGTH 2
@@ -53,7 +53,7 @@ inline
 static unsigned int
 hash (register const char *str, register size_t len)
 {
-  static unsigned char asso_values[] =
+  static const unsigned char asso_values[] =
     {
       11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
       11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
@@ -96,7 +96,7 @@ struct stringpool_t
     char stringpool_str6[sizeof("else")];
     char stringpool_str7[sizeof("while")];
   };
-static struct stringpool_t stringpool_contents =
+static const struct stringpool_t stringpool_contents =
   {
     "if",
     "int",
@@ -108,10 +108,10 @@ static struct stringpool_t stringpool_contents =
     "while"
   };
 #define stringpool ((const char *) &stringpool_contents)
-struct resword *
+const struct resword *
 is_resword (register const char *str, register size_t len)
 {
-  static struct resword wordlist[] =
+  static const struct resword wordlist[] =
     {
 #line 14 "reswords.gperf"
       {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str0, IF},
@@ -137,7 +137,7 @@ is_resword (register const char *str, register size_t len)
 
       if (key <= MAX_HASH_VALUE && key >= MIN_HASH_VALUE)
         {
-          register struct resword *resword;
+          register const struct resword *resword;
 
           switch (key - 2)
             {
@@ -169,7 +169,7 @@ is_resword (register const char *str, register size_t len)
           return 0;
         compare:
           {
-            register const char *s = (int)resword->name + stringpool;
+            register const char *s = stringpool + (int)(size_t)resword->name;
 
             if (*str == *s && !strncmp (str + 1, s + 1, len - 1) && s[len] == '\0')
               return resword;

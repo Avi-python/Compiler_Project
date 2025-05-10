@@ -1,6 +1,4 @@
-int main()
-{
-    int a = 1 + 2;
-    in : & a;
-    return 0;
+{ 
+    num = (2 + 3) * 4; 
+    a = 1 + num;
 }

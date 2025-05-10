@@ -1,6 +1,6 @@
 %{
 #include <string.h> // Required for strdup if yylval is char* and you copy yytext
-#include "tokens.h"
+#include "parser.tab.h"
 #include "error.h"
 #include "reswords.h"
 
@@ -34,10 +34,10 @@ character   \'([^'])\'
 "*"             { column += yyleng; return MUL; }
 "/"             { column += yyleng; return DIV; }
 "="             { column += yyleng; return ASSIGN; }
-"("             { column += yyleng; return LPAREN; }  
-")"             { column += yyleng; return RPAREN; }
-"{"             { column += yyleng; return LBRACE; }
-"}"             { column += yyleng; return RBRACE; }
+"("             { column += yyleng; return L_PAREN; }  
+")"             { column += yyleng; return R_PAREN; }
+"{"             { column += yyleng; return L_BRACE; }
+"}"             { column += yyleng; return R_BRACE; }
 ";"             { column += yyleng; return SEMI; }
 
 {identifier}    { 

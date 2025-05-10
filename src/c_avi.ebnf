@@ -1,14 +1,12 @@
-<Program> ::= <Block>
+<Block> ::= '{' <StatementList> '}'
 
-<Block> ::= 'int' <Space> 'main' '(' ')' <CompoundStatement>
+<StatementList> ::= <Statement>{;<Statement>}
 
-<CompoundStatement> ::= '{' <Statement>{;<Statement>} '}'
+<Statement> ::= \ <AssignmentStatement> | <Block> | <DeclareStatment> \ ;
 
-<Statement> ::= [ <AssignmentStatement> | <CompoundStatement> | <DeclareStatment> ] 
+<AssignmentStatement> ::= <Identifier> = <Expression>   
 
-<AssignmentStatement> ::= <Identifier> '=' <Expression>   
-
-<DeclareStatment> ::= <Type> <Identifier> ['=' Expression]
+<DeclareStatment> ::= <Type> <Identifier> [= Expression]
 
 <Expression> ::= [+|-] <Term> { \+|-\ <Term> } // TODO 要處理 Unary 的狀況，或是說可以先無視
 
@@ -20,7 +18,7 @@
 
 <Number> ::= <Digit> { <Digit> }                    
 
-<Type> ::= 'int' | 'char'
+<Type> ::= int | char
 
 <Alpha> ::= A|B|C|D|E|F|G|H|I|J|K|L|M|N|O|P|Q|R|S|T|U|V|W|X|Y|Z|a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z
 
