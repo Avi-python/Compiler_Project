@@ -1,6 +1,7 @@
 # Compiler and tools
 CC = gcc
 FLEX = flex
+GPERF = gperf
 
 # Compiler flags (add -g for debugging, -Wall for warnings)
 CFLAGS = -Wall -g
@@ -13,6 +14,7 @@ TARGET = scanner_test
 # Source files
 LEX_L_FILE = scanner.l
 TEST_C_FILE = scanner_test.c
+RESWORDS_GPERF_FILE = reswords.gperf
 
 # Generated C file from Flex
 LEX_C_FILE = lex.yy.c
@@ -21,6 +23,7 @@ LEX_C_FILE = lex.yy.c
 # scanner.l includes tokens.h and resword.h
 # scanner_test.c includes tokens.h
 HEADERS = tokens.h
+RESWORDS_H_FILE = reswords.h
 
 # Default target: build the executable
 all: $(TARGET)
@@ -32,8 +35,12 @@ $(TARGET): $(TEST_C_FILE) $(LEX_C_FILE) $(HEADERS)
 
 # Rule to generate lex.yy.c from scanner.l
 # Depends on the .l file and any headers it includes.
-$(LEX_C_FILE): $(LEX_L_FILE) $(HEADERS)
+$(LEX_C_FILE): $(LEX_L_FILE) $(RESWORDS_H_FILE) $(HEADERS) 
 	$(FLEX) -o $@ $(LEX_L_FILE)
+
+$(RESWORDS_H_FILE): $(RESWORDS_GPERF_FILE)
+	$(GPERF) -S 1 -C -c -P -t -N is_resword $(RESWORDS_GPERF_FILE) | \
+	sed 's/register const char \*s = resword->name + stringpool;/register const char *s = stringpool + (int)(size_t)resword->name;/' > $(RESWORDS_H_FILE)
 
 # Target to clean up generated files
 clean:

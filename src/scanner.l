@@ -54,7 +54,7 @@ character   \'([^'])\'
 
 {number}        { yylval.ival = atoi(yytext); column += yyleng; return NUMBER; } // Assuming yylval.ival is int
 {character}     { yylval.sval = strdup(yytext); column += yyleng; ; return CHAR; } // Assuming yylval.sval is char* for the literal string
-.               { save_error_pos("unexpected character", yytext); column += yyleng;  /* Stilcolumn += yyleng; */ }
+.               { save_error_pos("unexpected character", strdup(yytext)); column += yyleng;  /* Stilcolumn += yyleng; */ }
 
 %%
 
