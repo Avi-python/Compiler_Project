@@ -54,7 +54,7 @@ character   \'([^'])\'
 
 {number}        { yylval.ival = atoi(yytext); column += yyleng; return NUMBER; } // Assuming yylval.ival is int
 {character}     { yylval.sval = strdup(yytext); column += yyleng; ; return CHAR; } // Assuming yylval.sval is char* for the literal string
-.               { save_error_pos("unexpected character", strdup(yytext)); column += yyleng;  /* Stilcolumn += yyleng; */ }
+.               { save_error_pos("unexpected character", yylex); column += yyleng;  /* Stilcolumn += yyleng; */ }
 
 %%
 
@@ -82,8 +82,8 @@ void show_and_free_errors()
         
         line[strcspn(line, "\n")] = '\0'; // Remove newline character
 
-        fprintf(stderr, "%s:%d:%d: error: %s\n", 
-                errors_arr[i]->filename, errors_arr[i]->row, errors_arr[i]->col, errors_arr[i]->type);
+        fprintf(stderr, "%s:%d:%d: error: %s, %s\n", 
+                errors_arr[i]->filename, errors_arr[i]->row, errors_arr[i]->col, errors_arr[i]->type, errors_arr[i]->msg);
         fprintf(stderr, "%d |%s\n", errors_arr[i]->row, line);
 
         for(int j = 0; j < errors_arr[i]->col + 2; j++) 
@@ -96,7 +96,7 @@ void show_and_free_errors()
     free_errors_arr();
 }
 
-void save_error_pos(char* type, char* token) 
+void save_error_pos(char* type, char* msg) 
 {
     if (error_count < 1024) 
     {
@@ -110,8 +110,8 @@ void save_error_pos(char* type, char* token)
         strncpy(errors_arr[error_count]->type, type, sizeof(errors_arr[error_count]->type) - 1);
         errors_arr[error_count]->type[sizeof(errors_arr[error_count]->type) - 1] = '\0'; // Ensure null-termination
 
-        strncpy(errors_arr[error_count]->token, token, sizeof(errors_arr[error_count]->token) - 1);
-        errors_arr[error_count]->token[sizeof(errors_arr[error_count]->token) - 1] = '\0'; // Ensure null-termination
+        strncpy(errors_arr[error_count]->msg, msg, sizeof(errors_arr[error_count]->msg) - 1);
+        errors_arr[error_count]->msg[sizeof(errors_arr[error_count]->msg) - 1] = '\0'; // Ensure null-termination
 
         error_count++;
     }

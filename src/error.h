@@ -3,5 +3,5 @@ typedef struct error_struct {
     int col;
     char filename[64];
     char type[64];
-    char token[64];
+    char msg[256];
 } Error;

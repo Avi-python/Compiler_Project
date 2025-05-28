@@ -1,26 +1,41 @@
+// TODO 要處理 Unary 的狀況，或是說可以先無視
+
 <Program> ::= <Block>
 
-<Block> ::= 'int' <Space> 'main' '(' ')' <CompoundStatement>
+<Block> ::= int main ( ) <CompoundStatement>
 
-<CompoundStatement> ::= '{' <Statement>{;<Statement>} '}'
+<CompoundStatement> ::= { <StatementList> }
 
-<Statement> ::= [ <AssignmentStatement> | <CompoundStatement> | <DeclareStatment> ] 
+<StatementList> ::= <Statement> <StatementList> | epsilon
 
-<AssignmentStatement> ::= <Identifier> '=' <Expression>   
+<Statement> ::= <AssignmentStatement> ;
+              | <CompoundStatement>
+              | <DeclareStatement> ;
+              | epsilon
 
-<DeclareStatment> ::= <Type> <Identifier> ['=' Expression]
+<AssignmentStatement> ::= <Identifier> = <Expression>
 
-<Expression> ::= [+|-] <Term> { \+|-\ <Term> } // TODO 要處理 Unary 的狀況，或是說可以先無視
+<DeclareStatement> ::= <Type> <Identifier> [= <Expression>]
 
-<Term> :: = <Factor> { \ *|/ \ <Factor> }             
+<Expression> ::= <Term> <ExpressionPrime>
 
-<Factor> ::= <Identifier>| <Number>| (<Expression>)                      
+<ExpressionPrime> ::= + <Term> <ExpressionPrime>
+                    | - <Term> <ExpressionPrime>
+                    | epsilon
 
-<Identifier> ::= <Alpha> { <Alpha> | <Digit> }        
+<Term> ::= <Factor> <TermPrime>
+
+<TermPrmie> ::= * <Factor> <TermPrime>
+              | / <Factor> <TermPrime>
+              | epsilon
+
+<Factor> ::= <Identifier> | <Number> | ( <Expression> )
+
+<Identifier> ::= <Alpha> { <Alpha> | <Digit> } // TODO : 修改一下這邊的 production，不要用 EBNF 的 '{'
 
 <Number> ::= <Digit> { <Digit> }                    
 
-<Type> ::= 'int' | 'char'
+<Type> ::= int | char
 
 <Alpha> ::= A|B|C|D|E|F|G|H|I|J|K|L|M|N|O|P|Q|R|S|T|U|V|W|X|Y|Z|a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z
 

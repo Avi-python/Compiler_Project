@@ -22,6 +22,7 @@
 #define DO             19
 #define WHILE          20
 #define CONST          21
+#define MAIN           22
 
 typedef union {
     int ival;

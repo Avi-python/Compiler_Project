@@ -9,11 +9,11 @@ CFLAGS = -Wall -g
 LDFLAGS = -lfl
 
 # Target executable
-TARGET = scanner_test
+TARGET = compiler
 
 # Source files
 LEX_L_FILE = scanner.l
-TEST_C_FILE = scanner_test.c
+PARSER_FILE = parser.c
 RESWORDS_GPERF_FILE = reswords.gperf
 
 # Generated C file from Flex
@@ -30,8 +30,8 @@ all: $(TARGET)
 
 # Rule to link the final executable
 # Depends on the main C file, the generated lexer C file, and relevant headers.
-$(TARGET): $(TEST_C_FILE) $(LEX_C_FILE) $(HEADERS)
-	$(CC) $(CFLAGS) -o $@ $(TEST_C_FILE) $(LEX_C_FILE) $(LDFLAGS)
+$(TARGET): $(PARSER_FILE) $(LEX_C_FILE) $(HEADERS)
+	$(CC) $(CFLAGS) -o $@ $(PARSER_FILE) $(LEX_C_FILE) $(LDFLAGS)
 
 # Rule to generate lex.yy.c from scanner.l
 # Depends on the .l file and any headers it includes.

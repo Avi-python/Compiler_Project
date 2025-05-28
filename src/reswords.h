@@ -1,5 +1,5 @@
 /* ANSI-C code produced by gperf version 3.1 */
-/* Command-line: gperf -S 1 -t -P -N is_resword -c reswords.gperf  */
+/* Command-line: gperf -S 1 -C -c -P -t -N is_resword reswords.gperf  */
 /* Computed positions: -k'1' */
 
 #if !((' ' == 32) && ('!' == 33) && ('"' == 34) && ('#' == 35) \
@@ -34,14 +34,14 @@
 #include <string.h> // Needed for strcmp
 #include "tokens.h"
 #line 8 "reswords.gperf"
-struct resword { const char *name; int type; };
+struct resword { char *name; int type; };
 
-#define TOTAL_KEYWORDS 8
+#define TOTAL_KEYWORDS 9
 #define MIN_WORD_LENGTH 2
 #define MAX_WORD_LENGTH 6
 #define MIN_HASH_VALUE 2
-#define MAX_HASH_VALUE 10
-/* maximum key range = 9, duplicates = 0 */
+#define MAX_HASH_VALUE 14
+/* maximum key range = 13, duplicates = 0 */
 
 #ifdef __GNUC__
 __inline
@@ -53,34 +53,34 @@ inline
 static unsigned int
 hash (register const char *str, register size_t len)
 {
-  static unsigned char asso_values[] =
+  static const unsigned char asso_values[] =
     {
-      11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-      11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-      11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-      11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-      11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-      11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-      11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-      11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-      11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-      11, 11, 11, 11, 11, 11, 11, 11, 11,  0,
-       5,  5, 11, 11, 11,  0, 11, 11, 11, 11,
-      11, 11, 11, 11,  0, 11, 11, 11, 11,  5,
-      11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-      11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-      11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-      11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-      11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-      11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-      11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-      11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-      11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-      11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-      11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-      11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-      11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-      11, 11, 11, 11, 11, 11
+      15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+      15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+      15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+      15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+      15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+      15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+      15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+      15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+      15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+      15, 15, 15, 15, 15, 15, 15, 15, 15,  0,
+       5, 10, 15, 15, 15,  0, 15, 15, 15,  5,
+      15, 15, 15, 15,  0, 15, 15, 15, 15,  5,
+      15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+      15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+      15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+      15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+      15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+      15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+      15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+      15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+      15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+      15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+      15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+      15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+      15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+      15, 15, 15, 15, 15, 15
     };
   return len + asso_values[(unsigned char)str[0]];
 }
@@ -93,10 +93,11 @@ struct stringpool_t
     char stringpool_str3[sizeof("const")];
     char stringpool_str4[sizeof("return")];
     char stringpool_str5[sizeof("do")];
-    char stringpool_str6[sizeof("else")];
+    char stringpool_str6[sizeof("main")];
     char stringpool_str7[sizeof("while")];
+    char stringpool_str8[sizeof("else")];
   };
-static struct stringpool_t stringpool_contents =
+static const struct stringpool_t stringpool_contents =
   {
     "if",
     "int",
@@ -104,31 +105,34 @@ static struct stringpool_t stringpool_contents =
     "const",
     "return",
     "do",
-    "else",
-    "while"
+    "main",
+    "while",
+    "else"
   };
 #define stringpool ((const char *) &stringpool_contents)
-struct resword *
+const struct resword *
 is_resword (register const char *str, register size_t len)
 {
-  static struct resword wordlist[] =
+  static const struct resword wordlist[] =
     {
-#line 14 "reswords.gperf"
-      {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str0, IF},
-#line 11 "reswords.gperf"
-      {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str1, INT},
-#line 12 "reswords.gperf"
-      {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str2, CHAR},
-#line 18 "reswords.gperf"
-      {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str3, CONST},
-#line 13 "reswords.gperf"
-      {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str4, RETURN},
-#line 16 "reswords.gperf"
-      {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str5, DO},
 #line 15 "reswords.gperf"
-      {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str6, ELSE},
+      {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str0, IF},
+#line 12 "reswords.gperf"
+      {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str1, INT},
+#line 13 "reswords.gperf"
+      {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str2, CHAR},
+#line 19 "reswords.gperf"
+      {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str3, CONST},
+#line 14 "reswords.gperf"
+      {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str4, RETURN},
 #line 17 "reswords.gperf"
-      {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str7, WHILE}
+      {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str5, DO},
+#line 11 "reswords.gperf"
+      {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str6, MAIN},
+#line 18 "reswords.gperf"
+      {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str7, WHILE},
+#line 16 "reswords.gperf"
+      {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str8, ELSE}
     };
 
   if (len <= MAX_WORD_LENGTH && len >= MIN_WORD_LENGTH)
@@ -137,7 +141,7 @@ is_resword (register const char *str, register size_t len)
 
       if (key <= MAX_HASH_VALUE && key >= MIN_HASH_VALUE)
         {
-          register struct resword *resword;
+          register const struct resword *resword;
 
           switch (key - 2)
             {
@@ -165,11 +169,14 @@ is_resword (register const char *str, register size_t len)
               case 8:
                 resword = &wordlist[7];
                 goto compare;
+              case 12:
+                resword = &wordlist[8];
+                goto compare;
             }
           return 0;
         compare:
           {
-            register const char *s = (int)resword->name + stringpool;
+            register const char *s = stringpool + (int)(size_t)resword->name;
 
             if (*str == *s && !strncmp (str + 1, s + 1, len - 1) && s[len] == '\0')
               return resword;

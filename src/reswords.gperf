@@ -8,6 +8,7 @@
 struct resword { char *name; int type; };
 
 %%
+main, MAIN
 int, INT
 char, CHAR
 return, RETURN

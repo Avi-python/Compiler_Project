@@ -12,5 +12,8 @@ src/scanner_test
 # vscode
 .vscode
 
+# obsidian
+.obsidian
+
 # Other generated files
 # If you have other generated files, add them here
