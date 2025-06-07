@@ -18,6 +18,7 @@
 	-  Identifier ( from `<AssignmentStatement>` )
 	- { ( from `<CompoundStatement>` )
 	- int, char ( from `<DeclareStatement>` )
+	- if ( from `<IfStatement>` )
 	- } 
 
 `<StatementList>`
@@ -25,6 +26,7 @@
 	- Identifier ( from `<AssignmentStatement>` )
 	- { ( from `<CompoundStatement>` )
 	- int, char ( from `<DeclareStatement>` )
+	- if ( from `<IfStatement>` )
 	- epsilon
 - Follow set
 	- }
@@ -34,11 +36,23 @@
 	- Identifier ( from `<AssignmentStatement>` )
 	- { ( from `<CompoundStatement>` )
 	- int, char ( from `<DeclareStatement>` )
+	- if ( from `<IfStatement>` )
 	- epsilon
 - Follow set
 	- Identifier ( from `<AssignmentStatement>` )
 	- { ( from `<CompoundStatement>` )
 	- int, char ( from `<DeclareStatement>` )
+	- if ( from `<IfStatement>` )
+	- }
+
+`<IfStatement>`
+- First set
+	- if
+- Follow set
+	- Identifier ( from `<AssignmentStatement>` )
+	- { ( from `<CompoundStatement>` )
+	- int, char ( from `<DeclareStatement>` )
+	- if ( from `<IfStatement>` )
 	- } 
 
 `<AssignmentStatement>`
@@ -53,6 +67,14 @@
 - Follow set
 	- ;
 
+`<Condition>`
+- First set
+	- Identifier 
+    - (
+    - Number
+- Follow set
+	- )
+
 `<Expression>`
 - First set
 	- Identifier 
@@ -61,6 +83,7 @@
 - Follow set
 	- )
 	- ;
+	- <, <=, \==, !=, >, >=
 
 `<ExpressionPrime>`
 - First set

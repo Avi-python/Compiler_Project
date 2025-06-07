@@ -22,6 +22,8 @@ extern FILE *yyin;   // Input stream
 extern char* yyfilename;
 extern int yylex();
 extern void save_error_pos(char* type, char* token);
+extern int error_count;
+extern void show_and_free_errors();
 
 YYSTYPE yylval;
 int token;
@@ -72,7 +74,7 @@ void match(int expected_type) {
     char error_msg[200];
     sprintf(error_msg, "Expected token %s but got %s",
             token_type_to_string(expected_type),
-            token_type_to_string(yylval.sval));
+            token_type_to_string(token));
     save_error_pos("syntax error", error_msg);
 }
 
@@ -125,7 +127,7 @@ void statement_list() {
     // If we reach here, it means we have an unexpected token.
     char error_msg[200];
     sprintf(error_msg, "Unexpected token %s in statement list",
-            token_type_to_string(yylval.sval));
+            token_type_to_string(token));
     save_error_pos("syntax error", error_msg);
 }
 
@@ -159,7 +161,7 @@ void statement() {
 
     char error_msg[200];
     sprintf(error_msg, "Unexpected token %s in statement",
-            token_type_to_string(yylval.sval));
+            token_type_to_string(token));
     save_error_pos("syntax error", error_msg);
 }
 
@@ -198,7 +200,7 @@ void type() {
 
     char error_msg[200];
     sprintf(error_msg, "Unexpected token %s in type declaration",
-            token_type_to_string(yylval.sval));
+            token_type_to_string(token));
     save_error_pos("syntax error", error_msg);
 }
 
@@ -231,7 +233,7 @@ void expression_prime() {
     // else: Epsilon production. Do nothing.
     char error_msg[200];
     sprintf(error_msg, "Unexpected token %s in expression prime",
-            token_type_to_string(yylval.sval));
+            token_type_to_string(token));
     save_error_pos("syntax error", error_msg);
 }
 
@@ -267,7 +269,7 @@ void term_prime() {
 
     char error_msg[200];
     sprintf(error_msg, "Unexpected token %s in term prime",
-            token_type_to_string(yylval.sval));
+            token_type_to_string(token));
     save_error_pos("syntax error", error_msg);
 }
 
@@ -293,7 +295,7 @@ void factor() {
 
     char error_msg[200];
     sprintf(error_msg, "Unexpected token %s in factor",
-            token_type_to_string(yylval.sval));
+            token_type_to_string(token));
     save_error_pos("syntax error", error_msg);
 }
 
@@ -303,13 +305,16 @@ void parse() {
     get_next_token(); // Initialize current_token
     program(); // Start parsing from the <Program> rule
 
-    if (token == 0) {
-        printf("\nParsing successful!\n");
-    } else {
+    if (token == 0) 
+    {
+        return;
+    } 
+    else 
+    {
         // This case should ideally be caught by program_parser checking for EOF.
         char error_msg[200];
         sprintf(error_msg, "Unexpected token %s at end of input",
-                token_type_to_string(yylval.sval));
+                token_type_to_string(token));
         save_error_pos("syntax error", error_msg);
     }
 }
@@ -328,6 +333,13 @@ int main(int argc, char **argv) {
     }
 
     parse();
+
+    if(error_count > 0) {
+        printf("Parsing completed with %d errors.\n", error_count);
+        show_and_free_errors();
+    } else {
+        printf("Parsing completed successfully.\n");
+    }
 
     return 0;
 }

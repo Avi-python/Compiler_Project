@@ -39,6 +39,12 @@ character   \'([^'])\'
 "{"             { column += yyleng; return LBRACE; }
 "}"             { column += yyleng; return RBRACE; }
 ";"             { column += yyleng; return SEMI; }
+"=="            { column += yyleng; return EQ; }
+"!="            { column += yyleng; return NE; }
+"<"             { column += yyleng; return LT; }
+"<="            { column += yyleng; return LE; }
+">"             { column += yyleng; return GT; }
+">="            { column += yyleng; return GE; }
 
 {identifier}    { 
     column += yyleng; 

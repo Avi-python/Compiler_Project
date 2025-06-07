@@ -23,6 +23,12 @@
 #define WHILE          20
 #define CONST          21
 #define MAIN           22
+#define LT             23
+#define LE             24
+#define GT             25
+#define GE             26
+#define EQ             27
+#define NE             28
 
 typedef union {
     int ival;

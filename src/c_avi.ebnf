@@ -11,11 +11,16 @@
 <Statement> ::= <AssignmentStatement> ;
               | <CompoundStatement>
               | <DeclareStatement> ;
+              | <IfStatement>
               | epsilon
 
 <AssignmentStatement> ::= <Identifier> = <Expression>
 
 <DeclareStatement> ::= <Type> <Identifier> [= <Expression>]
+
+<IfStatement> ::= if ( <Condition> ) <CompoundStatement> [ else <CompoundStatement> ]
+
+<Condition> ::= <Expression> \<|<=|==|!=|>|>=\ <Expression>                 
 
 <Expression> ::= <Term> <ExpressionPrime>
 
@@ -25,7 +30,7 @@
 
 <Term> ::= <Factor> <TermPrime>
 
-<TermPrmie> ::= * <Factor> <TermPrime>
+<TermPrime> ::= * <Factor> <TermPrime>
               | / <Factor> <TermPrime>
               | epsilon
 
