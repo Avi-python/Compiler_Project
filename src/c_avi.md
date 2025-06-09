@@ -83,15 +83,33 @@
 - Follow set
 	- )
 	- ;
-	- <, <=, \==, !=, >, >=
 
-`<ExpressionPrime>`
+`<ArithmeticExpression>`
+- First set
+	- Identifier
+	- (
+	- Number
+- Follow set
+	- )
+	- ;
+	- <, <=, >, >=, ==, !=
+
+`<RelationalPrime>`
+- First set
+	- <, <=, >, >=, ==, !=
+	- epsilon
+- Follow set
+	- )
+	- ;
+
+`<ArithmeticPrime>`
 - First set
 	- +, -
 	- epsilon
 - Follow set
 	- )
 	- ;
+	- <, <=, >, >=, ==, !=
 
 `<Term>`
 - First set
@@ -101,6 +119,7 @@
 - Follow set
 	- +, -
 	- ), ;
+	- <, <=, >, >=, ==, !=
 
 `<TermPrime>`
 - First set
@@ -109,6 +128,7 @@
 - Follow set
 	- +, -
 	- ), ;
+	- <, <=, >, >=, ==, !=
 
 `<Factor>`
 - First set
@@ -119,6 +139,7 @@
 	- \*, /
 	- +, -
 	- ), ;
+	- <, <=, >, >=, ==, !=
 
 `<Identifier>`
 - First set
@@ -127,6 +148,7 @@
 	- \*, /
 	- +, -
 	- ), ;
+	- <, <=, >, >=, ==, !=
 
 `<Number>`
 - First set
@@ -135,6 +157,7 @@
 	- \*, /
 	- +, -
 	- ), ;
+	- <, <=, >, >=, ==, !=
 
 `<Type>`
 - First set

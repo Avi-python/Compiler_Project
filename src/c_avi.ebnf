@@ -18,14 +18,22 @@
 
 <DeclareStatement> ::= <Type> <Identifier> [= <Expression>]
 
-<IfStatement> ::= if ( <Condition> ) <CompoundStatement> [ else <CompoundStatement> ]
+<IfStatement> ::= if ( <Expression> ) <CompoundStatement> [ else <CompoundStatement> ]
 
-<Condition> ::= <Expression> \<|<=|==|!=|>|>=\ <Expression>                 
+<Expression> ::= <ArithmeticExpression> <RelationalPrime>
 
-<Expression> ::= <Term> <ExpressionPrime>
+<RelationalPrime> ::= < <ArithmeticExpression> <RelationalPrime>
+                    | <= <ArithmeticExpression> <RelationalPrime>
+                    | > <ArithmeticExpression> <RelationalPrime>
+                    | >= <ArithmeticExpression> <RelationalPrime>
+                    | == <ArithmeticExpression> <RelationalPrime>
+                    | != <ArithmeticExpression> <RelationalPrime>
+                    | epsilon
 
-<ExpressionPrime> ::= + <Term> <ExpressionPrime>
-                    | - <Term> <ExpressionPrime>
+<ArithmeticExpression> := <Term> <ArithmeticPrime>
+
+<ArithmeticPrime> ::= + <Term> <ArithmeticPrime>
+                    | - <Term> <ArithmeticPrime>
                     | epsilon
 
 <Term> ::= <Factor> <TermPrime>

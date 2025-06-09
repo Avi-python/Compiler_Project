@@ -13,10 +13,14 @@ void assignment_statement();
 void declare_statement();
 void expression();
 void expression_prime();
+void arithmetic_expression();
+void arithmetic_prime();
+void relational_prime();
 void term();
 void term_prime();
 void factor();
 void type();
+void if_statement();
 
 extern FILE *yyin;   // Input stream
 extern char* yyfilename;
@@ -51,6 +55,12 @@ char* token_type_to_string(int token_type) {
         case WHILE: return "WHILE";
         case CONST: return "CONST";
         case MAIN: return "MAIN";
+        case LE: return "LE";
+        case GE: return "GE";
+        case EQ: return "EQ";
+        case NE: return "NE";
+        case LT: return "LT";
+        case GT: return "GT";
         case 0: return "EOF"; // End of file
         default: 
             return "UNKNOWN"; // For any unrecognized token type
@@ -115,7 +125,7 @@ void compound_statement() {
 // For a standalone statement_list_parser (if needed elsewhere), it would be:
 void statement_list() {
     printf("Parsing <StatementList>\n");
-    if(token == IDENTIFIER || token == INT || token == CHAR || token == LBRACE) 
+    if(token == IDENTIFIER || token == INT || token == CHAR || token == LBRACE || token == IF) 
     {
         statement();
         statement_list(); // Recursive call to handle the next statement
@@ -124,7 +134,6 @@ void statement_list() {
 
     if (token == RBRACE) return; // Epsilon production: do nothing, end of statement list. 
 
-    // If we reach here, it means we have an unexpected token.
     char error_msg[200];
     sprintf(error_msg, "Unexpected token %s in statement list",
             token_type_to_string(token));
@@ -152,6 +161,10 @@ void statement() {
     if(token == IDENTIFIER) {
         assignment_statement();
         match(SEMI);
+        return;
+    }
+    if(token == IF) {
+        if_statement();
         return;
     }
     // else: Epsilon production for <Statement>. Do nothing, consume no tokens.
@@ -204,35 +217,101 @@ void type() {
     save_error_pos("syntax error", error_msg);
 }
 
-// <Expression> ::= <Term> <ExpressionPrime>
+// <Expression> ::= <ArithmeticExpression> <RelationalPrime>
 void expression() {
     printf("Parsing <Expression>\n");
-    term();
-    expression_prime();
+    arithmetic_expression();
+    relational_prime();
 }
 
-// <ExpressionPrime> ::= + <Term> <ExpressionPrime>
-//                     | - <Term> <ExpressionPrime>
+// <ArithmeticExpression> ::= <Term> <ArithmeticPrime>
+void arithmetic_expression() {
+    printf("Parsing <ArithmeticExpression>\n");
+    term();
+    arithmetic_prime();
+}
+
+// <ArithmeticPrime> ::= + <Term> <ArithmeticPrime>
+//                     | - <Term> <ArithmeticPrime>
 //                     | epsilon
-void expression_prime() {
-    printf("Parsing <ExpressionPrime> (current token: %s)\n", token_type_to_string(token));
+void arithmetic_prime() {
+    printf("Parsing <ArithmeticPrime> (current token: %s)\n", token_type_to_string(token));
     if (token == PLUS) {
         match(PLUS);
         term();
-        expression_prime();
+        arithmetic_prime();
         return;
     } 
     if (token == MINUS) {
         match(MINUS);
         term();
-        expression_prime();
+        arithmetic_prime();
         return;
     }
 
-    if(token == RPAREN || token == SEMI) return;
     // else: Epsilon production. Do nothing.
+    if(token == RPAREN || token == SEMI || token == LE || token == GE || 
+        token == LT || token == GT || token == EQ || token == NE) return;
+
     char error_msg[200];
     sprintf(error_msg, "Unexpected token %s in expression prime",
+            token_type_to_string(token));
+    save_error_pos("syntax error", error_msg);
+}
+
+// <RelationalPrime> ::= == <ArithmeticExpression> <RelationalPrime>
+//                     | != <ArithmeticExpression> <RelationalPrime>
+//                     | < <ArithmeticExpression> <RelationalPrime>
+//                     | > <ArithmeticExpression> <RelationalPrime>
+//                     | <= <ArithmeticExpression> <RelationalPrime>
+//                     | >= <ArithmeticExpression> <RelationalPrime>
+//                     | epsilon
+void relational_prime() {
+    printf("Parsing <RelationalPrime> (current token: %s)\n", token_type_to_string(token));
+    if (token == EQ) {
+        match(EQ);
+        arithmetic_expression();
+        relational_prime();
+        return;
+    } 
+    if (token == NE) {
+        match(NE);
+        arithmetic_expression();
+        relational_prime();
+        return;
+    } 
+    if (token == LT) {
+        match(LT);
+        arithmetic_expression();
+        relational_prime();
+        return;
+    } 
+    if (token == GT) {
+        match(GT);
+        arithmetic_expression();
+        relational_prime();
+        return;
+    } 
+    if (token == LE) {
+        match(LE);
+        arithmetic_expression();
+        relational_prime();
+        return;
+    } 
+    if (token == GE) {
+        match(GE);
+        arithmetic_expression();
+        relational_prime();
+        return;
+    }
+
+    // else: Epsilon production. Do nothing.
+    if(token == RPAREN || token == SEMI) {
+        return;
+    }
+
+    char error_msg[200];
+    sprintf(error_msg, "Unexpected token %s in relational prime",
             token_type_to_string(token));
     save_error_pos("syntax error", error_msg);
 }
@@ -263,9 +342,8 @@ void term_prime() {
     }
 
     // else: Epsilon production. Do nothing.
-    if(token == PLUS || token == MINUS || token == RPAREN || token == SEMI) {
-        return;
-    }
+    if(token == PLUS || token == MINUS || token == RPAREN || token == SEMI || token == LE || token == GE || 
+        token == LT || token == GT || token == EQ || token == NE) return;
 
     char error_msg[200];
     sprintf(error_msg, "Unexpected token %s in term prime",
@@ -297,6 +375,20 @@ void factor() {
     sprintf(error_msg, "Unexpected token %s in factor",
             token_type_to_string(token));
     save_error_pos("syntax error", error_msg);
+}
+
+void if_statement() 
+{
+    printf("Parsing <IfStatement> (current token: %s)\n", token_type_to_string(token));
+    match(IF);
+    match(LPAREN);
+    expression();
+    match(RPAREN);
+    compound_statement();
+    if (token == ELSE) {
+        match(ELSE);
+        compound_statement();
+    }
 }
 
 // --- Main Driver ---
