@@ -83,13 +83,12 @@
 - Follow set
 	- ;
 
-`<Condition>`
+`<InitDeclarator>`
 - First set
-	- Identifier 
-    - (
-    - Number
+	- Identifier
 - Follow set
-	- )
+	- ,
+	- ;
 
 `<Expression>`
 - First set
@@ -99,6 +98,7 @@
 - Follow set
 	- )
 	- ;
+	- ,
 
 `<ArithmeticExpression>`
 - First set

@@ -17,7 +17,9 @@
 
 <AssignmentStatement> ::= <Identifier> = <Expression>
 
-<DeclareStatement> ::= <Type> <Identifier> [= <Expression>]
+<InitDeclarator> ::= <Identifier> [ = <Expression> ]
+
+<DeclareStatement> ::= <Type> <InitDeclarator> { , <InitDeclarator> }
 
 <IfStatement> ::= if ( <Expression> ) <CompoundStatement> [ else <CompoundStatement> ]
 

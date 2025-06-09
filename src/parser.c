@@ -11,6 +11,7 @@ void statement_list();
 void statement();
 void assignment_statement();
 void declare_statement();
+void init_declarator();
 void expression();
 void expression_prime();
 void arithmetic_expression();
@@ -62,6 +63,7 @@ char* token_type_to_string(int token_type) {
         case NE: return "NE";
         case LT: return "LT";
         case GT: return "GT";
+        case COMMA: return "COMMA";
         case 0: return "EOF"; // End of file
         default: 
             return "UNKNOWN"; // For any unrecognized token type
@@ -197,11 +199,29 @@ void assignment_statement() {
 void declare_statement() {
     printf("Parsing <DeclareStatment>\n");
     type();
+    init_declarator();
+
+    while(token == COMMA) {
+        match(COMMA);
+        init_declarator();
+    }
+}
+
+void init_declarator() {
+    printf("Parsing <InitDeclarator>\n");
     match(IDENTIFIER);
-    if (token == ASSIGN) { // TODO : 這邊對應的 ebnf 應該要修
+    if (token == ASSIGN) 
+    {
         match(ASSIGN);
         expression();
-    }
+        return;
+    } 
+    if(token == COMMA || token == SEMI) return;
+
+    char error_msg[200];
+    sprintf(error_msg, "Expected '=' or ',' or ';' after identifier, got %s",
+            token_type_to_string(token));
+    save_error_pos("syntax error", error_msg);
 }
 
 // <Type> ::= int | char
@@ -258,7 +278,7 @@ void arithmetic_prime() {
 
     // else: Epsilon production. Do nothing.
     if(token == RPAREN || token == SEMI || token == LE || token == GE || 
-        token == LT || token == GT || token == EQ || token == NE) return;
+        token == LT || token == GT || token == EQ || token == NE || token == COMMA) return;
 
     char error_msg[200];
     sprintf(error_msg, "Unexpected token %s in expression prime",
@@ -313,7 +333,7 @@ void relational_prime() {
     }
 
     // else: Epsilon production. Do nothing.
-    if(token == RPAREN || token == SEMI) {
+    if(token == RPAREN || token == SEMI || token == COMMA) {
         return;
     }
 
@@ -350,7 +370,7 @@ void term_prime() {
 
     // else: Epsilon production. Do nothing.
     if(token == PLUS || token == MINUS || token == RPAREN || token == SEMI || token == LE || token == GE || 
-        token == LT || token == GT || token == EQ || token == NE) return;
+        token == LT || token == GT || token == EQ || token == NE || token == COMMA) return;
 
     char error_msg[200];
     sprintf(error_msg, "Unexpected token %s in term prime",

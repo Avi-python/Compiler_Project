@@ -45,6 +45,7 @@ character   \'([^'])\'
 "<="            { column += yyleng; return LE; }
 ">"             { column += yyleng; return GT; }
 ">="            { column += yyleng; return GE; }
+","             { column += yyleng; return COMMA; }
 
 {identifier}    { 
     column += yyleng; 

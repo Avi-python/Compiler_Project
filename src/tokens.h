@@ -29,6 +29,7 @@
 #define GE             26
 #define EQ             27
 #define NE             28
+#define COMMA          29
 
 typedef union {
     int ival;

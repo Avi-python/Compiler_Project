@@ -1,7 +1,7 @@
 int main()
 {
-    int a;
-    int b = 3 * 34 + 3;
+    int a, b = 3, c = 4 + 1, d;
+    b = 3 * 34 + 3;
     if(b > 10)
     {
         a = 5;
