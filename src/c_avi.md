@@ -19,6 +19,7 @@
 	- { ( from `<CompoundStatement>` )
 	- int, char ( from `<DeclareStatement>` )
 	- if ( from `<IfStatement>` )
+	- while ( from `<WhileStatement>` )
 	- } 
 
 `<StatementList>`
@@ -27,6 +28,7 @@
 	- { ( from `<CompoundStatement>` )
 	- int, char ( from `<DeclareStatement>` )
 	- if ( from `<IfStatement>` )
+	- while ( from `<WhileStatement>` )
 	- epsilon
 - Follow set
 	- }
@@ -37,12 +39,14 @@
 	- { ( from `<CompoundStatement>` )
 	- int, char ( from `<DeclareStatement>` )
 	- if ( from `<IfStatement>` )
+	- while ( from `<WhileStatement>` )
 	- epsilon
 - Follow set
 	- Identifier ( from `<AssignmentStatement>` )
 	- { ( from `<CompoundStatement>` )
 	- int, char ( from `<DeclareStatement>` )
 	- if ( from `<IfStatement>` )
+	- while ( from `<WhileStatement>` )
 	- }
 
 `<IfStatement>`
@@ -53,7 +57,19 @@
 	- { ( from `<CompoundStatement>` )
 	- int, char ( from `<DeclareStatement>` )
 	- if ( from `<IfStatement>` )
+	- while ( from `<WhileStatement>` )
 	- } 
+
+`<WhileStatement>`
+- First set
+	- while
+- Follow set
+	- Identifier ( from `<AssignmentStatement>` )
+	- { ( from `<CompoundStatement>` )
+	- int, char ( from `<DeclareStatement>` )
+	- if ( from `<IfStatement>` )
+	- while ( from `<WhileStatement>` )
+	- }
 
 `<AssignmentStatement>`
 - First set
@@ -175,4 +191,4 @@
 - First set
 	- [0-9]
 - Follow set
-	- 
+	-

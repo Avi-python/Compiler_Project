@@ -21,6 +21,7 @@ void term_prime();
 void factor();
 void type();
 void if_statement();
+void while_statement();
 
 extern FILE *yyin;   // Input stream
 extern char* yyfilename;
@@ -125,7 +126,7 @@ void compound_statement() {
 // For a standalone statement_list_parser (if needed elsewhere), it would be:
 void statement_list() {
     printf("Parsing <StatementList>\n");
-    if(token == IDENTIFIER || token == INT || token == CHAR || token == LBRACE || token == IF) 
+    if(token == IDENTIFIER || token == INT || token == CHAR || token == LBRACE || token == IF || token == WHILE) 
     {
         statement();
         statement_list(); // Recursive call to handle the next statement
@@ -144,6 +145,8 @@ void statement_list() {
 // <Statement> ::= <AssignmentStatement> ;
 //               | <CompoundStatement> ;
 //               | <DeclareStatment> ;
+//               | <IfStatement> ;
+//               | <WhileStatement> ;
 //               | epsilon
 void statement() {
     printf("Parsing <Statement> (current token: %s)\n", token_type_to_string(token));
@@ -167,8 +170,12 @@ void statement() {
         if_statement();
         return;
     }
+    if(token == WHILE) {
+        while_statement();
+        return;
+    }
     // else: Epsilon production for <Statement>. Do nothing, consume no tokens.
-    if(token == IDENTIFIER || token == INT || token == CHAR || token == LBRACE || token == RBRACE) {
+    if(token == IDENTIFIER || token == INT || token == CHAR || token == LBRACE || token == RBRACE || token == WHILE) {
         return;
     }
 
@@ -389,6 +396,17 @@ void if_statement()
         match(ELSE);
         compound_statement();
     }
+}
+
+// <WhileStatement> ::= while ( <Expression> ) <CompoundStatement>
+void while_statement()
+{
+    printf("Parsing <WhileStatement> (current token: %s)\n", token_type_to_string(token));
+    match(WHILE);
+    match(LPAREN);
+    expression();
+    match(RPAREN);
+    compound_statement();
 }
 
 // --- Main Driver ---
