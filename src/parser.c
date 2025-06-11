@@ -5,6 +5,13 @@
 
 // Forward declarations for recursive functions
 void program();
+void external_declaration(); // New
+void declarations(); // New
+void function_definition(); // New
+void variable_declaration_global(); // New
+void parameter_list_opt(); // New
+void parameter_list(); // New
+void parameter_declaration(); // New
 void block();
 void compound_statement();
 void statement_list();
@@ -50,6 +57,7 @@ char* token_type_to_string(int token_type) {
         case SEMI: return "SEMI";
         case INT: return "INT";
         case CHAR: return "CHAR";
+        case VOID: return "VOID";
         case RETURN: return "RETURN";
         case IF: return "IF";
         case ELSE: return "ELSE";
@@ -64,9 +72,9 @@ char* token_type_to_string(int token_type) {
         case LT: return "LT";
         case GT: return "GT";
         case COMMA: return "COMMA";
-        case 0: return "EOF"; // End of file
+        case 0: return "EOF";
         default: 
-            return "UNKNOWN"; // For any unrecognized token type
+            return "UNKNOWN";
     }
 }
 
@@ -91,24 +99,117 @@ void match(int expected_type) {
     save_error_pos("syntax error", error_msg);
 }
 
-// <Program> ::= <Block>
+// <Program> ::= <ExternalDeclaration> { <ExternalDeclaration> }
 void program() {
-    block();
-    // After a successful program parse, we expect EOF
-    if (token != 0) {
+    printf("Parsing <Program>\n");
+    // Loop to handle one or more external declarations
+    while (token == INT || token == CHAR || token == VOID) { // First of <ExternalDeclaration> is First of <Type>
+        external_declaration();
+    }
+    // After all external declarations, we expect EOF
+    if (token != 0) { // 0 is typically EOF
         save_error_pos("syntax error", "Expected EOF after program");
     }
 }
 
+// <ExternalDeclaration> ::= <Type> <Identifier> <Declarations>
+void external_declaration() {
+    printf("Parsing <ExternalDeclaration>\n");
+    type();
+    match(IDENTIFIER);
+    declarations();
+}
+
+// <Declarations> ::= <FunctionDefinition> | <VariableDeclarationGlobal> ;
+void declarations() {
+    printf("Parsing <Declarations>\n");
+    if (token == LPAREN) { // First of <FunctionDefinition>
+        function_definition();
+        return;
+    }
+    if (token == ASSIGN || token == COMMA || token == SEMI) { // First of <VariableDeclarationGlobal> or Follow if epsilon
+        variable_declaration_global();
+        match(SEMI);
+        return;
+    } 
+
+    // TODO : error handling
+}
+
+// <VariableDeclarationGlobal> ::= [ = <Expression> ] { , <Identifier> [ = <Expression> ] }
+void variable_declaration_global() {
+    printf("Parsing <VariableDeclarationGlobal>\n");
+    if (token == ASSIGN) {
+        match(ASSIGN);
+        expression();
+    }
+    while (token == COMMA) {
+        match(COMMA);
+        match(IDENTIFIER);
+        if (token == ASSIGN) {
+            match(ASSIGN);
+            expression();
+        }
+    }
+}
+
+// <FunctionDefinition> ::= ( <ParameterListOpt> ) <CompoundStatement>
+void function_definition() {
+    printf("Parsing <FunctionDefinition>\n");
+    match(LPAREN);
+    parameter_list_opt();
+    match(RPAREN);
+    compound_statement();
+}
+
+// <ParameterListOpt> ::= <ParameterList> | epsilon
+void parameter_list_opt() {
+    printf("Parsing <ParameterListOpt>\n");
+
+    if (token == INT || token == CHAR || token == VOID) {
+        parameter_list();
+        return;
+    }
+    // Epsilon production. Follow is RPAREN, already handled by caller or next match.
+    if(token == RPAREN) return;
+
+    // TODO : error handling
+}
+
+// <ParameterList> ::= <ParameterDeclaration> { , <ParameterDeclaration> }
+void parameter_list() {
+    printf("Parsing <ParameterList>\n");
+    parameter_declaration();
+    while (token == COMMA) {
+        match(COMMA);
+        parameter_declaration();
+    }
+}
+
+// <ParameterDeclaration> ::= <Type> <Identifier>
+void parameter_declaration() {
+    printf("Parsing <ParameterDeclaration>\n");
+    type();
+    match(IDENTIFIER);
+}
+
+
 // <Block> ::= int main ( ) <CompoundStatement>
+// This is no longer the top-level program structure.
+// It might be useful if we want to enforce a 'main' function specifically,
+// but the current EBNF treats all functions similarly.
+// For now, I will comment it out. If a specific 'main' handling is needed,
+// it would be a semantic check or a modified grammar rule.
+/*
 void block() {
-    printf("Parsing <Block>\n");
+    printf("Parsing <Block>\\n");
     match(INT);
-    match(MAIN);
+    match(MAIN); // MAIN token would be needed if we distinguish main
     match(LPAREN);
     match(RPAREN);
     compound_statement();
 }
+*/
 
 // <CompoundStatement> ::= { <StatementList> }
 // Note: This function parses the content *within* the braces.
@@ -128,63 +229,72 @@ void compound_statement() {
 // For a standalone statement_list_parser (if needed elsewhere), it would be:
 void statement_list() {
     printf("Parsing <StatementList>\n");
-    if(token == IDENTIFIER || token == INT || token == CHAR || token == LBRACE || token == IF || token == WHILE) 
-    {
+    // First of <Statement>: IDENTIFIER, LBRACE, INT, CHAR, IF, WHILE
+    // Follow of <StatementList> is RBRACE (})
+    while (token == IDENTIFIER || token == LBRACE || token == INT || token == CHAR || token == IF || token == WHILE) {
         statement();
-        statement_list(); // Recursive call to handle the next statement
-        return;
-    } 
+    }
+    // Epsilon is handled if the loop condition is not met and token is RBRACE (Follow of StatementList)
+    if (token == RBRACE) return; 
 
-    if (token == RBRACE) return; // Epsilon production: do nothing, end of statement list. 
-
-    char error_msg[200];
-    sprintf(error_msg, "Unexpected token %s in statement list",
-            token_type_to_string(token));
-    save_error_pos("syntax error", error_msg);
+    // If it's not a valid start of a statement and not the end of the list, it's an error.
+    // However, error reporting for unexpected tokens in statement_list might be better handled
+    // if statement() itself reports an error when it cannot parse anything and doesn't find an epsilon.
+    // For now, let's assume statement() handles its own errors or consumes tokens.
 }
 
 
 // <Statement> ::= <AssignmentStatement> ;
-//               | <CompoundStatement> ;
+//               | <CompoundStatement>
 //               | <DeclareStatment> ;
-//               | <IfStatement> ;
-//               | <WhileStatement> ;
+//               | <IfStatement>
+//               | <WhileStatement>;
 //               | epsilon
 void statement() {
     printf("Parsing <Statement> (current token: %s)\n", token_type_to_string(token));
     // Lookahead for specific statement types
-    if (token == INT || token == CHAR) {
+    if (token == INT || token == CHAR) { // First of <DeclareStatement>
         declare_statement();
         match(SEMI);
         return;
     } 
-    if (token == LBRACE) 
-    {
-        compound_statement();
+    if (token == LBRACE) { // First of <CompoundStatement>
+        compound_statement(); // CompoundStatement in EBNF for statement does not have a trailing semicolon
         return;
     }
-    if(token == IDENTIFIER) {
+    if(token == IDENTIFIER) { // First of <AssignmentStatement>
+        // Need to distinguish between assignment and function call if we add function calls
         assignment_statement();
         match(SEMI);
         return;
     }
-    if(token == IF) {
-        if_statement();
+    if(token == IF) { // First of <IfStatement>
+        if_statement(); // IfStatement in EBNF does not have a trailing semicolon
         return;
     }
-    if(token == WHILE) {
-        while_statement();
+    if(token == WHILE) { // First of <WhileStatement>
+        while_statement(); // WhileStatement in EBNF does not have a trailing semicolon
         return;
     }
-    // else: Epsilon production for <Statement>. Do nothing, consume no tokens.
-    if(token == IDENTIFIER || token == INT || token == CHAR || token == LBRACE || token == RBRACE || token == WHILE) {
+    
+    // Epsilon production for <Statement>
+    // Follow(<Statement>) = { IDENTIFIER, LBRACE, INT, CHAR, IF, WHILE, RBRACE }
+    // If current token is in Follow(<Statement>), it means an empty statement (epsilon) is valid.
+    if (token == RBRACE || // End of a compound statement
+        token == IDENTIFIER || // Start of next statement
+        token == LBRACE ||     // Start of next compound statement
+        token == INT || token == CHAR || // Start of next declaration statement
+        token == IF || token == WHILE) { // Start of next control flow statement
         return;
     }
 
+    // If no rule matches and it's not a valid epsilon case based on Follow set.
     char error_msg[200];
     sprintf(error_msg, "Unexpected token %s in statement",
             token_type_to_string(token));
     save_error_pos("syntax error", error_msg);
+    // Potentially advance token to attempt recovery, or let caller handle.
+    // For now, error is saved, and parsing might halt or behave unpredictably.
 }
 
 // <AssignmentStatement> ::= <Identifier> = <Expression>
@@ -195,7 +305,7 @@ void assignment_statement() {
     expression();
 }
 
-// <DeclareStatment> ::= <Type> <Identifier> [= <Expression>]
+// <DeclareStatement> ::= <Type> <InitDeclarator> { , <InitDeclarator> }
 void declare_statement() {
     printf("Parsing <DeclareStatment>\n");
     type();
@@ -207,6 +317,7 @@ void declare_statement() {
     }
 }
 
+// <InitDeclarator> ::= <Identifier> [ = <Expression> ]
 void init_declarator() {
     printf("Parsing <InitDeclarator>\n");
     match(IDENTIFIER);
@@ -237,6 +348,11 @@ void type() {
         match(CHAR);
         return;
     } 
+    if (token == VOID) // Added VOID
+    {
+        match(VOID);
+        return;
+    }
 
     char error_msg[200];
     sprintf(error_msg, "Unexpected token %s in type declaration",
@@ -404,6 +520,7 @@ void factor() {
     save_error_pos("syntax error", error_msg);
 }
 
+// <IfStatement> ::= if ( <Expression> ) <CompoundStatement> [ else <CompoundStatement> ]
 void if_statement() 
 {
     printf("Parsing <IfStatement> (current token: %s)\n", token_type_to_string(token));
@@ -437,13 +554,13 @@ void parse() {
 
     if (token == 0) 
     {
+        printf("Parsing reached EOF as expected.\n");
         return;
     } 
     else 
     {
-        // This case should ideally be caught by program_parser checking for EOF.
         char error_msg[200];
-        sprintf(error_msg, "Unexpected token %s at end of input",
+        sprintf(error_msg, "Unexpected token %s at end of input instead of EOF",
                 token_type_to_string(token));
         save_error_pos("syntax error", error_msg);
     }

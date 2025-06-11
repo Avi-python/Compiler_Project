@@ -8,9 +8,9 @@
 struct resword { char *name; int type; };
 
 %%
-main, MAIN
 int, INT
 char, CHAR
+void, VOID
 return, RETURN
 if, IF
 else, ELSE

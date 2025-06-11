@@ -65,8 +65,8 @@ hash (register const char *str, register size_t len)
       15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
       15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
       15, 15, 15, 15, 15, 15, 15, 15, 15,  0,
-       5, 10, 15, 15, 15,  0, 15, 15, 15,  5,
-      15, 15, 15, 15,  0, 15, 15, 15, 15,  5,
+       5, 10, 15, 15, 15,  0, 15, 15, 15, 15,
+      15, 15, 15, 15,  0, 15, 15, 15,  5,  5,
       15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
       15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
       15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
@@ -93,7 +93,7 @@ struct stringpool_t
     char stringpool_str3[sizeof("const")];
     char stringpool_str4[sizeof("return")];
     char stringpool_str5[sizeof("do")];
-    char stringpool_str6[sizeof("main")];
+    char stringpool_str6[sizeof("void")];
     char stringpool_str7[sizeof("while")];
     char stringpool_str8[sizeof("else")];
   };
@@ -105,7 +105,7 @@ static const struct stringpool_t stringpool_contents =
     "const",
     "return",
     "do",
-    "main",
+    "void",
     "while",
     "else"
   };
@@ -117,9 +117,9 @@ is_resword (register const char *str, register size_t len)
     {
 #line 15 "reswords.gperf"
       {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str0, IF},
-#line 12 "reswords.gperf"
+#line 11 "reswords.gperf"
       {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str1, INT},
-#line 13 "reswords.gperf"
+#line 12 "reswords.gperf"
       {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str2, CHAR},
 #line 19 "reswords.gperf"
       {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str3, CONST},
@@ -127,8 +127,8 @@ is_resword (register const char *str, register size_t len)
       {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str4, RETURN},
 #line 17 "reswords.gperf"
       {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str5, DO},
-#line 11 "reswords.gperf"
-      {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str6, MAIN},
+#line 13 "reswords.gperf"
+      {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str6, VOID},
 #line 18 "reswords.gperf"
       {(int)(size_t)&((struct stringpool_t *)0)->stringpool_str7, WHILE},
 #line 16 "reswords.gperf"

@@ -1,12 +1,22 @@
-// TODO 要處理 Unary 的狀況，或是說可以先無視
+<Program> ::= <ExternalDeclaration> { <ExternalDeclaration> }
 
-<Program> ::= <Block>
+<ExternalDeclaration> ::= <Type> <Identifier> <Declarations>
 
-<Block> ::= int main ( ) <CompoundStatement>
+<Declarations> ::= <FunctionDefinition> | <VariableDeclarationGlobal> ;
 
-<CompoundStatement> ::= { <StatementList> }
+<VariableDeclarationGlobal> ::= [ = <Expression> ] { , <Identifier> [ = <Expression> ] }
 
-<StatementList> ::= <Statement> <StatementList> | epsilon
+<FunctionDefinition> ::= ( <ParameterListOpt> ) <CompoundStatement>
+
+<ParameterListOpt> ::= <ParameterList> | epsilon
+
+<ParameterList> ::= <ParameterDeclaration> { , <ParameterDeclaration> }
+
+<ParameterDeclaration> ::= <Type> <Identifier>
+
+<CompoundStatement> ::= `{` <StatementList> `}`
+
+<StatementList> ::= { <Statement> }
 
 <Statement> ::= <AssignmentStatement> ;
               | <CompoundStatement>
@@ -49,11 +59,11 @@
 
 <Factor> ::= <Identifier> | <Number> | ( <Expression> )
 
-<Identifier> ::= <Alpha> { <Alpha> | <Digit> } // TODO : 修改一下這邊的 production，不要用 EBNF 的 '{'
+<Identifier> ::= <Alpha> { <Alpha> | <Digit> }
 
 <Number> ::= <Digit> { <Digit> }                    
 
-<Type> ::= int | char
+<Type> ::= int | char | void
 
 <Alpha> ::= A|B|C|D|E|F|G|H|I|J|K|L|M|N|O|P|Q|R|S|T|U|V|W|X|Y|Z|a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z
 

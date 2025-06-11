@@ -30,6 +30,7 @@
 #define EQ             27
 #define NE             28
 #define COMMA          29
+#define VOID           30
 
 typedef union {
     int ival;

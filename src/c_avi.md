@@ -1,8 +1,56 @@
 `<Program>`
 - First set
-	- int
+	- int, char, void (from `<Type>`)
 - Follow set
 	- EOF
+
+`<ExternalDeclaration>`
+- First set
+	- int, char, void
+- Follow set
+	- EOF
+
+`<Declarations>`
+- First set
+	- (, =, 
+	- ,
+	- ;
+- Follow set
+	- EOF
+
+`<FunctionDefinition>`
+- First set
+	- (
+- Follow set
+	- EOF
+
+`<VariableDeclarationGlobal>`
+- First set
+	- =,
+	- ,
+	- epsilon
+- Follow set
+	- ;
+
+`<ParameterListOpt>`
+- First set
+	- int, char, void (from `<Type>`)
+	- epsilon
+- Follow set
+	- )
+
+`<ParameterList>`
+- First set
+	- int, char, void (from `<Type>`)
+- Follow set
+	- )
+
+`<ParameterDeclaration>`
+- First set
+	- int, char, void (from `<Type>`)
+- Follow set
+	 - ,
+	 - )
 
 `<Block>`
 - First set
@@ -109,6 +157,7 @@
 	- )
 	- ;
 	- <, <=, >, >=, ==, !=
+	- ,
 
 `<RelationalPrime>`
 - First set
@@ -117,6 +166,7 @@
 - Follow set
 	- )
 	- ;
+	- ,
 
 `<ArithmeticPrime>`
 - First set
@@ -126,6 +176,7 @@
 	- )
 	- ;
 	- <, <=, >, >=, ==, !=
+	- ,
 
 `<Term>`
 - First set
@@ -136,6 +187,7 @@
 	- +, -
 	- ), ;
 	- <, <=, >, >=, ==, !=
+	- ,
 
 `<TermPrime>`
 - First set
@@ -145,6 +197,7 @@
 	- +, -
 	- ), ;
 	- <, <=, >, >=, ==, !=
+	- ,
 
 `<Factor>`
 - First set
@@ -156,6 +209,7 @@
 	- +, -
 	- ), ;
 	- <, <=, >, >=, ==, !=
+	- ,
 
 `<Identifier>`
 - First set
@@ -165,6 +219,7 @@
 	- +, -
 	- ), ;
 	- <, <=, >, >=, ==, !=
+	- ,
 
 `<Number>`
 - First set
@@ -174,6 +229,7 @@
 	- +, -
 	- ), ;
 	- <, <=, >, >=, ==, !=
+	- ,
 
 `<Type>`
 - First set
