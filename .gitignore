@@ -12,6 +12,9 @@ src/scanner_test
 # vscode
 .vscode
 
+# 
+src/parser_logs.txt
+
 # obsidian
 .obsidian
 

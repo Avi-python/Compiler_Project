@@ -5,18 +5,22 @@
 
 // Forward declarations for recursive functions
 void program();
-void external_declaration(); // New
-void declarations(); // New
-void function_definition(); // New
-void variable_declaration_global(); // New
-void parameter_list_opt(); // New
-void parameter_list(); // New
-void parameter_declaration(); // New
+void external_declaration();
+void declarations();
+void function_definition();
+void variable_declaration_global();
+void parameter_list_opt();
+void parameter_list();
+void parameter_declaration();
 void block();
 void compound_statement();
 void statement_list();
 void statement();
+void assign_or_func_call();
 void assignment_statement();
+void function_call_statement();
+void argument_list_opt();
+void argument_list();
 void declare_statement();
 void init_declarator();
 void expression();
@@ -27,9 +31,12 @@ void relational_prime();
 void term();
 void term_prime();
 void factor();
+void epsilon_or_func_call();
 void type();
 void if_statement();
 void while_statement();
+
+FILE *log_file; // Log file for parser output
 
 extern FILE *yyin;   // Input stream
 extern char* yyfilename;
@@ -40,6 +47,28 @@ extern void show_and_free_errors();
 
 YYSTYPE yylval;
 int token;
+
+// Helper function to check if token is in follow set
+int is_in_follow_set(int* follow_set, int size) {
+    for (int i = 0; i < size; i++) {
+        if (token == follow_set[i]) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+// Error recovery function - skip tokens until we find one in the follow set
+void error_recovery(int* follow_set, int size, const char* production_name) {
+    char error_msg[300];
+    sprintf(error_msg, "Error recovery in %s: skipping tokens until valid follow token", production_name);
+    save_error_pos("syntax error", error_msg);
+    
+    while (token != 0 && !is_in_follow_set(follow_set, size)) {
+        fprintf(log_file, "Skipping token: %s during error recovery\n", token_type_to_string(token));
+        get_next_token();
+    }
+}
 
 char* token_type_to_string(int token_type) {
     switch (token_type) {
@@ -64,7 +93,6 @@ char* token_type_to_string(int token_type) {
         case DO: return "DO";
         case WHILE: return "WHILE";
         case CONST: return "CONST";
-        case MAIN: return "MAIN";
         case LE: return "LE";
         case GE: return "GE";
         case EQ: return "EQ";
@@ -84,7 +112,7 @@ void get_next_token() {
 
 // Match and consume a token
 void match(int expected_type) {
-    printf("Matching token: %s (expected: %s)\n", 
+    fprintf(log_file, "Matching token: %s (expected: %s)\n", 
            token_type_to_string(token), 
            token_type_to_string(expected_type));
     if (token == expected_type) 
@@ -101,7 +129,7 @@ void match(int expected_type) {
 
 // <Program> ::= <ExternalDeclaration> { <ExternalDeclaration> }
 void program() {
-    printf("Parsing <Program>\n");
+    fprintf(log_file, "Parsing <Program>\n");
     // Loop to handle one or more external declarations
     while (token == INT || token == CHAR || token == VOID) { // First of <ExternalDeclaration> is First of <Type>
         external_declaration();
@@ -114,7 +142,7 @@ void program() {
 
 // <ExternalDeclaration> ::= <Type> <Identifier> <Declarations>
 void external_declaration() {
-    printf("Parsing <ExternalDeclaration>\n");
+    fprintf(log_file, "Parsing <ExternalDeclaration>\n");
     type();
     match(IDENTIFIER);
     declarations();
@@ -122,7 +150,7 @@ void external_declaration() {
 
 // <Declarations> ::= <FunctionDefinition> | <VariableDeclarationGlobal> ;
 void declarations() {
-    printf("Parsing <Declarations>\n");
+    fprintf(log_file, "Parsing <Declarations>\n");
     if (token == LPAREN) { // First of <FunctionDefinition>
         function_definition();
         return;
@@ -133,12 +161,18 @@ void declarations() {
         return;
     } 
 
-    // TODO : error handling
+    // Error handling based on follow set: int, char, void, EOF
+    int follow_set[] = {INT, CHAR, VOID, 0}; // EOF represented as 0
+    char error_msg[200];
+    sprintf(error_msg, "Expected function definition '(' or variable declaration '=', ',', ';' in declarations, got %s",
+            token_type_to_string(token));
+    save_error_pos("syntax error", error_msg);
+    error_recovery(follow_set, 4, "declarations");
 }
 
 // <VariableDeclarationGlobal> ::= [ = <Expression> ] { , <Identifier> [ = <Expression> ] }
 void variable_declaration_global() {
-    printf("Parsing <VariableDeclarationGlobal>\n");
+    fprintf(log_file, "Parsing <VariableDeclarationGlobal>\n");
     if (token == ASSIGN) {
         match(ASSIGN);
         expression();
@@ -151,11 +185,21 @@ void variable_declaration_global() {
             expression();
         }
     }
+
+    // epsilon production is handled by the loop condition.
+    if(token == SEMI) return;
+
+    int follow_set[] = {SEMI}; 
+    char error_msg[200];
+    sprintf(error_msg, "Expected ',' or ';' after variable declaration, got %s",
+            token_type_to_string(token));
+    save_error_pos("syntax error", error_msg);
+    error_recovery(follow_set, 2, "variable_declaration_global");
 }
 
 // <FunctionDefinition> ::= ( <ParameterListOpt> ) <CompoundStatement>
 void function_definition() {
-    printf("Parsing <FunctionDefinition>\n");
+    fprintf(log_file, "Parsing <FunctionDefinition>\n");
     match(LPAREN);
     parameter_list_opt();
     match(RPAREN);
@@ -164,7 +208,7 @@ void function_definition() {
 
 // <ParameterListOpt> ::= <ParameterList> | epsilon
 void parameter_list_opt() {
-    printf("Parsing <ParameterListOpt>\n");
+    fprintf(log_file, "Parsing <ParameterListOpt>\n");
 
     if (token == INT || token == CHAR || token == VOID) {
         parameter_list();
@@ -173,12 +217,18 @@ void parameter_list_opt() {
     // Epsilon production. Follow is RPAREN, already handled by caller or next match.
     if(token == RPAREN) return;
 
-    // TODO : error handling
+    // Error handling based on follow set: RPAREN
+    int follow_set[] = {RPAREN};
+    char error_msg[200];
+    sprintf(error_msg, "Expected parameter type (int, char, void) or ')' in parameter list, got %s",
+            token_type_to_string(token));
+    save_error_pos("syntax error", error_msg);
+    error_recovery(follow_set, 1, "parameter_list_opt");
 }
 
 // <ParameterList> ::= <ParameterDeclaration> { , <ParameterDeclaration> }
 void parameter_list() {
-    printf("Parsing <ParameterList>\n");
+    fprintf(log_file, "Parsing <ParameterList>\n");
     parameter_declaration();
     while (token == COMMA) {
         match(COMMA);
@@ -188,7 +238,7 @@ void parameter_list() {
 
 // <ParameterDeclaration> ::= <Type> <Identifier>
 void parameter_declaration() {
-    printf("Parsing <ParameterDeclaration>\n");
+    fprintf(log_file, "Parsing <ParameterDeclaration>\n");
     type();
     match(IDENTIFIER);
 }
@@ -217,7 +267,7 @@ void block() {
 // or by statement_parser if it's a compound statement used as a statement.
 // For simplicity, this function will match its own braces.
 void compound_statement() {
-    printf("Parsing <CompoundStatement>\n");
+    fprintf(log_file, "Parsing <CompoundStatement>\n");
     match(LBRACE);
     statement_list();
     match(RBRACE);
@@ -228,7 +278,7 @@ void compound_statement() {
 // This is handled by the loop in compound_statement_parser.
 // For a standalone statement_list_parser (if needed elsewhere), it would be:
 void statement_list() {
-    printf("Parsing <StatementList>\n");
+    fprintf(log_file, "Parsing <StatementList>\n");
     // First of <Statement>: IDENTIFIER, LBRACE, INT, CHAR, IF, WHILE
     // Follow of <StatementList> is RBRACE (})
     while (token == IDENTIFIER || token == LBRACE || token == INT || token == CHAR || token == IF || token == WHILE) {
@@ -237,21 +287,23 @@ void statement_list() {
     // Epsilon is handled if the loop condition is not met and token is RBRACE (Follow of StatementList)
     if (token == RBRACE) return; 
 
-    // If it's not a valid start of a statement and not the end of the list, it's an error.
-    // However, error reporting for unexpected tokens in statement_list might be better handled
-    // if statement() itself reports an error when it cannot parse anything and doesn't find an epsilon.
-    // For now, let's assume statement() handles its own errors or consumes tokens.
+    int follow_set[] = {RBRACE};
+    char error_msg[200];
+    sprintf(error_msg, "Unexpected token %s in statement list",
+            token_type_to_string(token));
+    save_error_pos("syntax error", error_msg);
+    error_recovery(follow_set, 1, "statement_list");
 }
 
 
-// <Statement> ::= <AssignmentStatement> ;
-//               | <CompoundStatement>
-//               | <DeclareStatment> ;
-//               | <IfStatement>
-//               | <WhileStatement>;
-//               | epsilon
+// <Statement> ::= | <CompoundStatement>
+//                | <DeclareStatement> ;
+//                | <Identifier> <AssignOrFuncCall> ;
+//                | <IfStatement>
+//                | <WhileStatement>
+//                | epsilon
 void statement() {
-    printf("Parsing <Statement> (current token: %s)\n", token_type_to_string(token));
+    fprintf(log_file, "Parsing <Statement> (current token: %s)\n", token_type_to_string(token));
     // Lookahead for specific statement types
     if (token == INT || token == CHAR) { // First of <DeclareStatement>
         declare_statement();
@@ -262,9 +314,9 @@ void statement() {
         compound_statement(); // CompoundStatement in EBNF for statement does not have a trailing semicolon
         return;
     }
-    if(token == IDENTIFIER) { // First of <AssignmentStatement>
-        // Need to distinguish between assignment and function call if we add function calls
-        assignment_statement();
+    if(token == IDENTIFIER) { // First of <Identifier> <AssignOrFuncCall>
+        match(IDENTIFIER); // Match the identifier first
+        assign_or_func_call(); // Then handle assignment or function call
         match(SEMI);
         return;
     }
@@ -289,25 +341,88 @@ void statement() {
     }
 
     // If no rule matches and it's not a valid epsilon case based on Follow set.
+    int follow_set[] = {IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE};
     char error_msg[200];
     sprintf(error_msg, "Unexpected token %s in statement",
             token_type_to_string(token));
     save_error_pos("syntax error", error_msg);
-    // Potentially advance token to attempt recovery, or let caller handle.
-    // For now, error is saved, and parsing might halt or behave unpredictably.
+    error_recovery(follow_set, 8, "statement");
 }
 
 // <AssignmentStatement> ::= <Identifier> = <Expression>
 void assignment_statement() {
-    printf("Parsing <AssignmentStatement>\n");
+    fprintf(log_file, "Parsing <AssignmentStatement>\n");
     match(IDENTIFIER);
     match(ASSIGN);
     expression();
 }
 
+// New function to handle assignment or function call based on the current token
+void assign_or_func_call() {
+    fprintf(log_file, "Parsing <AssignOrFuncCall> (current token: %s)\n", token_type_to_string(token));
+    
+    // Check for assignment: = <Expression>
+    if (token == ASSIGN) {
+        match(ASSIGN);
+        expression();
+        return;
+    }
+
+    // Check for function call: ( <ArgumentListOpt> )
+    if (token == LPAREN) {
+        function_call_statement();
+        return;
+    }
+
+    int follow_set[] = {SEMI}; // Follow set for <AssignOrFuncCall>
+    char error_msg[200];
+    sprintf(error_msg, "Expected '=' or '(' after identifier, got %s",
+            token_type_to_string(token));
+    save_error_pos("syntax error", error_msg);
+    error_recovery(follow_set, 1, "assign_or_func_call");
+}
+
+// <FunctionCallStatement> ::= <Identifier> ( <ArgumentListOpt> ) ;
+void function_call_statement() {
+    fprintf(log_file, "Parsing <FunctionCallStatement>\n");
+    match(LPAREN);
+    argument_list_opt();
+    match(RPAREN);
+}
+
+// <ArgumentListOpt> ::= <ArgumentList> | epsilon
+void argument_list_opt() {
+    fprintf(log_file, "Parsing <ArgumentListOpt>\n");
+
+    if (token == IDENTIFIER || token == NUMBER || token == LPAREN) {
+        argument_list();
+        return;
+    }
+    // Epsilon production. Follow is RPAREN, already handled by caller or next match.
+    if(token == RPAREN) return;
+
+    // Error handling based on follow set: RPAREN
+    int follow_set[] = {RPAREN};
+    char error_msg[200];
+    sprintf(error_msg, "Expected expression (identifier, number, or '(') or ')' in argument list, got %s",
+            token_type_to_string(token));
+    save_error_pos("syntax error", error_msg);
+    error_recovery(follow_set, 1, "argument_list_opt");
+}
+
+// <ArgumentList> ::= <Expression> { , <Expression> }
+void argument_list() {
+    fprintf(log_file, "Parsing <ArgumentList>\n");
+    expression();
+    while (token == COMMA) {
+        match(COMMA);
+        expression();
+    }
+}
+
 // <DeclareStatement> ::= <Type> <InitDeclarator> { , <InitDeclarator> }
 void declare_statement() {
-    printf("Parsing <DeclareStatment>\n");
+    fprintf(log_file, "Parsing <DeclareStatment>\n");
     type();
     init_declarator();
 
@@ -319,7 +434,7 @@ void declare_statement() {
 
 // <InitDeclarator> ::= <Identifier> [ = <Expression> ]
 void init_declarator() {
-    printf("Parsing <InitDeclarator>\n");
+    fprintf(log_file, "Parsing <InitDeclarator>\n");
     match(IDENTIFIER);
     if (token == ASSIGN) 
     {
@@ -329,15 +444,17 @@ void init_declarator() {
     } 
     if(token == COMMA || token == SEMI) return;
 
+    int follow_set[] = {COMMA, SEMI}; // Follow set for <InitDeclarator>
     char error_msg[200];
     sprintf(error_msg, "Expected '=' or ',' or ';' after identifier, got %s",
             token_type_to_string(token));
     save_error_pos("syntax error", error_msg);
+    error_recovery(follow_set, 2, "init_declarator");
 }
 
 // <Type> ::= int | char
 void type() {
-    printf("Parsing <Type>\n");
+    fprintf(log_file, "Parsing <Type>\n");
     if (token == INT) 
     {
         match(INT);
@@ -353,23 +470,18 @@ void type() {
         match(VOID);
         return;
     }
-
-    char error_msg[200];
-    sprintf(error_msg, "Unexpected token %s in type declaration",
-            token_type_to_string(token));
-    save_error_pos("syntax error", error_msg);
 }
 
 // <Expression> ::= <ArithmeticExpression> <RelationalPrime>
 void expression() {
-    printf("Parsing <Expression>\n");
+    fprintf(log_file, "Parsing <Expression>\n");
     arithmetic_expression();
     relational_prime();
 }
 
 // <ArithmeticExpression> ::= <Term> <ArithmeticPrime>
 void arithmetic_expression() {
-    printf("Parsing <ArithmeticExpression>\n");
+    fprintf(log_file, "Parsing <ArithmeticExpression>\n");
     term();
     arithmetic_prime();
 }
@@ -378,7 +490,7 @@ void arithmetic_expression() {
 //                     | - <Term> <ArithmeticPrime>
 //                     | epsilon
 void arithmetic_prime() {
-    printf("Parsing <ArithmeticPrime> (current token: %s)\n", token_type_to_string(token));
+    fprintf(log_file, "Parsing <ArithmeticPrime> (current token: %s)\n", token_type_to_string(token));
     if (token == PLUS) {
         match(PLUS);
         term();
@@ -410,7 +522,7 @@ void arithmetic_prime() {
 //                     | >= <ArithmeticExpression> <RelationalPrime>
 //                     | epsilon
 void relational_prime() {
-    printf("Parsing <RelationalPrime> (current token: %s)\n", token_type_to_string(token));
+    fprintf(log_file, "Parsing <RelationalPrime> (current token: %s)\n", token_type_to_string(token));
     if (token == EQ) {
         match(EQ);
         arithmetic_expression();
@@ -461,7 +573,7 @@ void relational_prime() {
 
 // <Term> ::= <Factor> <TermPrime>
 void term() {
-    printf("Parsing <Term>\n");
+    fprintf(log_file, "Parsing <Term>\n");
     factor();
     term_prime(); // Corrected from TermPrmie
 }
@@ -470,7 +582,7 @@ void term() {
 //               | / <Factor> <TermPrime>
 //               | epsilon
 void term_prime() {
-    printf("Parsing <TermPrime> (current token: %s)\n", token_type_to_string(token));
+    fprintf(log_file, "Parsing <TermPrime> (current token: %s)\n", token_type_to_string(token));
     if (token == MUL) {
         match(MUL);
         factor();
@@ -494,12 +606,13 @@ void term_prime() {
     save_error_pos("syntax error", error_msg);
 }
 
-// <Factor> ::= <Identifier> | <Number> | ( <Expression> )
+// <Factor> ::= <Identifier> <EpsilonOrFuncCall> | <Number> | ( <Expression> )
 void factor() {
-    printf("Parsing <Factor> (current token: %s)\n", token_type_to_string(token));
+    fprintf(log_file, "Parsing <Factor> (current token: %s)\n", token_type_to_string(token));
     if (token == IDENTIFIER) 
     {
         match(IDENTIFIER);
+        epsilon_or_func_call();
         return;
     } 
     if (token == NUMBER) 
@@ -520,10 +633,34 @@ void factor() {
     save_error_pos("syntax error", error_msg);
 }
 
+// <EpsilonOrFuncCall> ::= epsilon | <FunctionCallStatement>
+void epsilon_or_func_call() {
+    fprintf(log_file, "Parsing <EpsilonOrFuncCall> (current token: %s)\n", token_type_to_string(token));
+    
+    if (token == LPAREN) {
+        function_call_statement();
+        return;
+    }
+    
+    // Epsilon production - do nothing if not a function call
+    // Follow set includes operators, semicolons, parentheses, etc.
+    if (token == MUL || token == DIV || token == PLUS || token == MINUS ||
+        token == LT || token == LE || token == GT || token == GE ||
+        token == EQ || token == NE || token == RPAREN || token == SEMI ||
+        token == COMMA) {
+        return;
+    }
+
+    char error_msg[200];
+    sprintf(error_msg, "Unexpected token %s after identifier in factor",
+            token_type_to_string(token));
+    save_error_pos("syntax error", error_msg);
+}
+
 // <IfStatement> ::= if ( <Expression> ) <CompoundStatement> [ else <CompoundStatement> ]
 void if_statement() 
 {
-    printf("Parsing <IfStatement> (current token: %s)\n", token_type_to_string(token));
+    fprintf(log_file, "Parsing <IfStatement> (current token: %s)\n", token_type_to_string(token));
     match(IF);
     match(LPAREN);
     expression();
@@ -538,7 +675,7 @@ void if_statement()
 // <WhileStatement> ::= while ( <Expression> ) <CompoundStatement>
 void while_statement()
 {
-    printf("Parsing <WhileStatement> (current token: %s)\n", token_type_to_string(token));
+    fprintf(log_file, "Parsing <WhileStatement> (current token: %s)\n", token_type_to_string(token));
     match(WHILE);
     match(LPAREN);
     expression();
@@ -567,6 +704,14 @@ void parse() {
 }
 
 int main(int argc, char **argv) {
+
+    log_file = fopen("parser_logs.txt", "w");
+
+    if(!log_file) {
+        perror("Failed to open log file");
+        return 1;
+    }
+
     if (argc > 1) {
         yyin = fopen(argv[1], "r");
         yyfilename = argv[1];

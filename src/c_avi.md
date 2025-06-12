@@ -6,9 +6,9 @@
 
 `<ExternalDeclaration>`
 - First set
-	- int, char, void
+	- int, char, void (from `<Type>`)
 - Follow set
-	- EOF
+	- int, char, void, EOF
 
 `<Declarations>`
 - First set
@@ -16,13 +16,13 @@
 	- ,
 	- ;
 - Follow set
-	- EOF
+	- int, char, void, EOF
 
 `<FunctionDefinition>`
 - First set
 	- (
 - Follow set
-	- EOF
+	- int, char, void, EOF
 
 `<VariableDeclarationGlobal>`
 - First set
@@ -52,29 +52,24 @@
 	 - ,
 	 - )
 
-`<Block>`
-- First set
-	- int
-- Follow set
-	- EOF
-
 `<CompoundStatement>`
 - First set
 	- {
 - Follow set
 	- EOF
-	-  Identifier ( from `<AssignmentStatement>` )
+	-  Identifier
 	- { ( from `<CompoundStatement>` )
-	- int, char ( from `<DeclareStatement>` )
+	- int, char, void ( from `<DeclareStatement>` )
 	- if ( from `<IfStatement>` )
 	- while ( from `<WhileStatement>` )
 	- } 
+	- else
 
 `<StatementList>`
 - First set
-	- Identifier ( from `<AssignmentStatement>` )
+	- Identifier
 	- { ( from `<CompoundStatement>` )
-	- int, char ( from `<DeclareStatement>` )
+	- int, char, void ( from `<DeclareStatement>` )
 	- if ( from `<IfStatement>` )
 	- while ( from `<WhileStatement>` )
 	- epsilon
@@ -83,51 +78,81 @@
 
 `<Statement>`
 - First set
-	- Identifier ( from `<AssignmentStatement>` )
+	- Identifier
 	- { ( from `<CompoundStatement>` )
-	- int, char ( from `<DeclareStatement>` )
+	- int, char, void ( from `<DeclareStatement>` )
 	- if ( from `<IfStatement>` )
 	- while ( from `<WhileStatement>` )
 	- epsilon
 - Follow set
-	- Identifier ( from `<AssignmentStatement>` )
-	- { ( from `<CompoundStatement>` )
-	- int, char ( from `<DeclareStatement>` )
-	- if ( from `<IfStatement>` )
-	- while ( from `<WhileStatement>` )
+	- Identifier
+	- { 
+	- int, char, void
+	- if
+	- while
 	- }
+
+`<AssignOrFuncCall>`
+- First set
+	- = ( from `<AssignmentStatement>` )
+	- ( ( from `<FunctionCallStatement>` )
+- Follow set
+	- ;
+
+`<AssignmentStatement>`
+- First set
+	- =
+- Follow set
+	- ;
+
+`<FunctionCallStatement>`
+- First set
+	- (
+- Follow set
+	- \*, /
+	- +, -
+	- ), ;
+	- <, <=, >, >=, ==, !=
+	- ,
+
+`<ArgumentListOpt>`
+- First set
+	- Identifier, Number, ( ( from `<Expression>` )
+	- epsilon
+- Follow set
+	- )
+
+`<ArgumentList>`
+- First set
+	- Identifier, Number, ( ( from `<Expression>` )
+- Follow set
+	- )
 
 `<IfStatement>`
 - First set
 	- if
 - Follow set
-	- Identifier ( from `<AssignmentStatement>` )
-	- { ( from `<CompoundStatement>` )
-	- int, char ( from `<DeclareStatement>` )
-	- if ( from `<IfStatement>` )
-	- while ( from `<WhileStatement>` )
+	- Identifier
+	- { 
+	- int, char, void
+	- if
+	- while
 	- } 
 
 `<WhileStatement>`
 - First set
 	- while
 - Follow set
-	- Identifier ( from `<AssignmentStatement>` )
-	- { ( from `<CompoundStatement>` )
-	- int, char ( from `<DeclareStatement>` )
-	- if ( from `<IfStatement>` )
-	- while ( from `<WhileStatement>` )
+	- Identifier
+	- { 
+	- int, char, void
+	- if
+	- while
 	- }
-
-`<AssignmentStatement>`
-- First set
-	-Identifier 
-- Follow set
-	- ;
 
 `<DeclareStatement>`
 - First set
-	- int, char
+	- int, char, void
 - Follow set
 	- ;
 
@@ -211,6 +236,17 @@
 	- <, <=, >, >=, ==, !=
 	- ,
 
+`<EpsilonOrFuncCall>`
+- First set
+	- ( ( from `<FunctionCallStatement>` )
+	- epsilon
+- Follow set
+	- \*, /
+	- +, -
+	- ), ;
+	- <, <=, >, >=, ==, !=
+	- ,
+
 `<Identifier>`
 - First set
 	- [A-Za-z]
@@ -220,6 +256,8 @@
 	- ), ;
 	- <, <=, >, >=, ==, !=
 	- ,
+	- =
+	- (
 
 `<Number>`
 - First set
@@ -233,7 +271,7 @@
 
 `<Type>`
 - First set
-	- int, char
+	- int, char, void
 - Follow set
 	- Identifier 
 
@@ -241,10 +279,26 @@
 - First set
 	- [A-Za-z]
 - Follow set
-	- {
+	- [A-Za-z]
+	- [0-9]
+	- \*, /
+	- +, -
+	- ), ;
+	- <, <=, >, >=, ==, !=
+	- ,
+	- =
+	- (
 
 `<Digit>`
 - First set
 	- [0-9]
 - Follow set
-	-
+	- [A-Za-z]
+	- [0-9]
+	- \*, /
+	- +, -
+	- ), ;
+	- <, <=, >, >=, ==, !=
+	- ,
+	- =
+	- (

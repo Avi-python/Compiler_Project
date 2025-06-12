@@ -18,14 +18,22 @@
 
 <StatementList> ::= { <Statement> }
 
-<Statement> ::= <AssignmentStatement> ;
-              | <CompoundStatement>
-              | <DeclareStatement> ;
-              | <IfStatement>
-              | <WhileStatement>
-              | epsilon
+<Statement> ::= | <CompoundStatement>
+                | <DeclareStatement> ;
+                | <Identifier> <AssignOrFuncCall> ;
+                | <IfStatement>
+                | <WhileStatement>
+                | epsilon
 
-<AssignmentStatement> ::= <Identifier> = <Expression>
+<AssignOrFuncCall> ::= <AssignmentStatement> | <FunctionCallStatement>
+
+<AssignmentStatement> ::= = <Expression>
+
+<FunctionCallStatement> ::= ( <ArgumentListOpt> )
+
+<ArgumentListOpt> ::= <ArgumentList> | epsilon
+
+<ArgumentList> ::= <Expression> { , <Expression> }
 
 <InitDeclarator> ::= <Identifier> [ = <Expression> ]
 
@@ -57,7 +65,9 @@
               | / <Factor> <TermPrime>
               | epsilon
 
-<Factor> ::= <Identifier> | <Number> | ( <Expression> )
+<Factor> ::= <Identifier> <EpsilonOrFuncCall> | <Number> | ( <Expression> )
+
+<EpsilonOrFuncCall> ::= epsilon | <FunctionCallStatement>
 
 <Identifier> ::= <Alpha> { <Alpha> | <Digit> }
 
