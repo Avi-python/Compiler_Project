@@ -72,6 +72,7 @@
 	- int, char, void ( from `<DeclareStatement>` )
 	- if ( from `<IfStatement>` )
 	- while ( from `<WhileStatement>` )
+	- return ( from `<ReturnStatement>` ) 
 	- epsilon
 - Follow set
 	- }
@@ -83,6 +84,7 @@
 	- int, char, void ( from `<DeclareStatement>` )
 	- if ( from `<IfStatement>` )
 	- while ( from `<WhileStatement>` )
+	- return ( from `<ReturnStatement>` )
 	- epsilon
 - Follow set
 	- Identifier
@@ -246,6 +248,12 @@
 	- ), ;
 	- <, <=, >, >=, ==, !=
 	- ,
+
+`<ReturnStatement>`
+- First set
+	- return
+- Follow set
+	- ;
 
 `<Identifier>`
 - First set

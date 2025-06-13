@@ -35,6 +35,7 @@ void epsilon_or_func_call();
 void type();
 void if_statement();
 void while_statement();
+void return_statement();
 
 FILE *log_file; // Log file for parser output
 
@@ -413,6 +414,16 @@ void statement()
     }
     if(token == WHILE) { // First of <WhileStatement>
         while_statement();
+        return;
+    }
+    if(token == RETURN) {
+        return_statement();
+        if(!match(SEMI)) {
+            char error_msg[200];
+            sprintf(error_msg, "Expected \';\' after return statement, got %s", token_type_to_string(token));
+            save_error_pos("syntax error", error_msg);
+            error_recovery(stmt_follow_set, stmt_follow_set_size, "statement_after_return");
+        }
         return;
     }
 
@@ -849,6 +860,17 @@ void while_statement()
         return;
     }
     compound_statement();
+}
+
+void return_statement() 
+{
+    fprintf(log_file, "Parsing <ReturnStatement> (current token: %s)\n", token_type_to_string(token));
+    match(RETURN);
+    
+    // Optional expression
+    if (token != SEMI && token != LBRACE && token != EOF) { // TODO : TBD
+        expression();
+    }
 }
 
 // --- Main Driver ---

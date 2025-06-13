@@ -23,6 +23,7 @@
                 | <Identifier> <AssignOrFuncCall> ;
                 | <IfStatement>
                 | <WhileStatement>
+                | <ReturnStatement> ;
                 | epsilon
 
 <AssignOrFuncCall> ::= <AssignmentStatement> | <FunctionCallStatement>
@@ -68,6 +69,8 @@
 <Factor> ::= <Identifier> <EpsilonOrFuncCall> | <Number> | ( <Expression> )
 
 <EpsilonOrFuncCall> ::= epsilon | <FunctionCallStatement>
+
+<ReturnStatement> ::= return [ <Expression> ]
 
 <Identifier> ::= <Alpha> { <Alpha> | <Digit> }
 
