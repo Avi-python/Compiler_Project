@@ -48,6 +48,10 @@ extern void show_and_free_errors();
 YYSTYPE yylval;
 int token;
 
+int is_in_follow_set(int* follow_set, int size);
+void error_recovery(int* follow_set, int size, const char* production_name);
+char* token_type_to_string(int token_type);
+
 // Helper function to check if token is in follow set
 int is_in_follow_set(int* follow_set, int size) {
     for (int i = 0; i < size; i++) {
@@ -100,7 +104,7 @@ char* token_type_to_string(int token_type) {
         case LT: return "LT";
         case GT: return "GT";
         case COMMA: return "COMMA";
-        case 0: return "EOF";
+        case EOF: return "EOF";
         default: 
             return "UNKNOWN";
     }
@@ -111,31 +115,27 @@ void get_next_token() {
 }
 
 // Match and consume a token
-void match(int expected_type) {
+int match(int expected_type) {
     fprintf(log_file, "Matching token: %s (expected: %s)\n", 
            token_type_to_string(token), 
            token_type_to_string(expected_type));
     if (token == expected_type) 
     {
         get_next_token();
-        return;
+        return 1;
     }
-    char error_msg[200];
-    sprintf(error_msg, "Expected token %s but got %s",
-            token_type_to_string(expected_type),
-            token_type_to_string(token));
-    save_error_pos("syntax error", error_msg);
+    return 0;
 }
 
 // <Program> ::= <ExternalDeclaration> { <ExternalDeclaration> }
 void program() {
     fprintf(log_file, "Parsing <Program>\n");
-    // Loop to handle one or more external declarations
+
     while (token == INT || token == CHAR || token == VOID) { // First of <ExternalDeclaration> is First of <Type>
         external_declaration();
     }
-    // After all external declarations, we expect EOF
-    if (token != 0) { // 0 is typically EOF
+
+    if (token != EOF) {
         save_error_pos("syntax error", "Expected EOF after program");
     }
 }
@@ -144,7 +144,16 @@ void program() {
 void external_declaration() {
     fprintf(log_file, "Parsing <ExternalDeclaration>\n");
     type();
-    match(IDENTIFIER);
+    if(!match(IDENTIFIER))
+    {
+        int follow_set[] = {INT, CHAR, VOID, EOF}; // Follow set for <ExternalDeclaration>
+        char error_msg[200];
+        sprintf(error_msg, "Expected identifier after type, got %s",
+                token_type_to_string(token));
+        save_error_pos("syntax error", error_msg);
+        error_recovery(follow_set, 4, "external_declaration");
+        return; // Early return on error
+    }
     declarations();
 }
 
@@ -157,17 +166,17 @@ void declarations() {
     }
     if (token == ASSIGN || token == COMMA || token == SEMI) { // First of <VariableDeclarationGlobal> or Follow if epsilon
         variable_declaration_global();
-        match(SEMI);
+        if(!match(SEMI))
+        {
+            int follow_set[] = {INT, CHAR, VOID, EOF}; // Follow set for <Declarations>
+            char error_msg[200];
+            sprintf(error_msg, "Expected ';' after variable declaration, got %s",
+                    token_type_to_string(token));
+            save_error_pos("syntax error", error_msg);
+            error_recovery(follow_set, 4, "declarations"); 
+        }
         return;
     } 
-
-    // Error handling based on follow set: int, char, void, EOF
-    int follow_set[] = {INT, CHAR, VOID, 0}; // EOF represented as 0
-    char error_msg[200];
-    sprintf(error_msg, "Expected function definition '(' or variable declaration '=', ',', ';' in declarations, got %s",
-            token_type_to_string(token));
-    save_error_pos("syntax error", error_msg);
-    error_recovery(follow_set, 4, "declarations");
 }
 
 // <VariableDeclarationGlobal> ::= [ = <Expression> ] { , <Identifier> [ = <Expression> ] }
@@ -179,22 +188,22 @@ void variable_declaration_global() {
     }
     while (token == COMMA) {
         match(COMMA);
-        match(IDENTIFIER);
+        if(!match(IDENTIFIER))
+        {
+            int follow_set[] = {SEMI}; // Follow set for <VariableDeclarationGlobal>
+            char error_msg[200];
+            sprintf(error_msg, "Expected identifier after ',', got %s",
+                    token_type_to_string(token));
+            save_error_pos("syntax error", error_msg);
+            error_recovery(follow_set, 1, "variable_declaration_global");
+            return;
+
+        }
         if (token == ASSIGN) {
             match(ASSIGN);
             expression();
         }
     }
-
-    // epsilon production is handled by the loop condition.
-    if(token == SEMI) return;
-
-    int follow_set[] = {SEMI}; 
-    char error_msg[200];
-    sprintf(error_msg, "Expected ',' or ';' after variable declaration, got %s",
-            token_type_to_string(token));
-    save_error_pos("syntax error", error_msg);
-    error_recovery(follow_set, 2, "variable_declaration_global");
 }
 
 // <FunctionDefinition> ::= ( <ParameterListOpt> ) <CompoundStatement>
@@ -202,7 +211,16 @@ void function_definition() {
     fprintf(log_file, "Parsing <FunctionDefinition>\n");
     match(LPAREN);
     parameter_list_opt();
-    match(RPAREN);
+    if(!match(RPAREN))
+    {
+        int follow_set[] = {INT, CHAR, VOID, EOF}; // Follow set for <FunctionDefinition>
+        char error_msg[200];
+        sprintf(error_msg, "Expected ')' after parameter list, got %s",
+                token_type_to_string(token));
+        save_error_pos("syntax error", error_msg);
+        error_recovery(follow_set, 4, "function_definition");
+        return;
+    }
     compound_statement();
 }
 
@@ -214,16 +232,7 @@ void parameter_list_opt() {
         parameter_list();
         return;
     }
-    // Epsilon production. Follow is RPAREN, already handled by caller or next match.
-    if(token == RPAREN) return;
 
-    // Error handling based on follow set: RPAREN
-    int follow_set[] = {RPAREN};
-    char error_msg[200];
-    sprintf(error_msg, "Expected parameter type (int, char, void) or ')' in parameter list, got %s",
-            token_type_to_string(token));
-    save_error_pos("syntax error", error_msg);
-    error_recovery(follow_set, 1, "parameter_list_opt");
 }
 
 // <ParameterList> ::= <ParameterDeclaration> { , <ParameterDeclaration> }
@@ -240,7 +249,16 @@ void parameter_list() {
 void parameter_declaration() {
     fprintf(log_file, "Parsing <ParameterDeclaration>\n");
     type();
-    match(IDENTIFIER);
+    if(!match(IDENTIFIER))
+    {
+        int follow_set[] = {COMMA, RPAREN}; // Follow set for <ParameterDeclaration>
+        char error_msg[200];
+        sprintf(error_msg, "Expected identifier after type in parameter declaration, got %s",
+                token_type_to_string(token));
+        save_error_pos("syntax error", error_msg);
+        error_recovery(follow_set, 2, "parameter_declaration");
+        return;
+    }
 }
 
 
@@ -260,7 +278,6 @@ void block() {
     compound_statement();
 }
 */
-
 // <CompoundStatement> ::= { <StatementList> }
 // Note: This function parses the content *within* the braces.
 // The braces themselves are matched by the caller if it's the top-level compound statement of a block,
@@ -270,29 +287,25 @@ void compound_statement() {
     fprintf(log_file, "Parsing <CompoundStatement>\n");
     match(LBRACE);
     statement_list();
-    match(RBRACE);
+    if(!match(RBRACE))
+    {
+        int follow_set[] = {EOF, IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE, ELSE}; // Follow set for <CompoundStatement>
+        char error_msg[200];
+        sprintf(error_msg, "Expected '}' at end of compound statement, got %s",
+                token_type_to_string(token));
+        save_error_pos("syntax error", error_msg);
+        error_recovery(follow_set, 10, "compound_statement");
+        return;
+    }
 }
 
 
 // <StatementList> ::= <Statement> <StatementList> | epsilon
-// This is handled by the loop in compound_statement_parser.
-// For a standalone statement_list_parser (if needed elsewhere), it would be:
 void statement_list() {
     fprintf(log_file, "Parsing <StatementList>\n");
-    // First of <Statement>: IDENTIFIER, LBRACE, INT, CHAR, IF, WHILE
-    // Follow of <StatementList> is RBRACE (})
     while (token == IDENTIFIER || token == LBRACE || token == INT || token == CHAR || token == IF || token == WHILE) {
         statement();
     }
-    // Epsilon is handled if the loop condition is not met and token is RBRACE (Follow of StatementList)
-    if (token == RBRACE) return; 
-
-    int follow_set[] = {RBRACE};
-    char error_msg[200];
-    sprintf(error_msg, "Unexpected token %s in statement list",
-            token_type_to_string(token));
-    save_error_pos("syntax error", error_msg);
-    error_recovery(follow_set, 1, "statement_list");
 }
 
 
@@ -304,34 +317,47 @@ void statement_list() {
 //                | epsilon
 void statement() {
     fprintf(log_file, "Parsing <Statement> (current token: %s)\n", token_type_to_string(token));
-    // Lookahead for specific statement types
     if (token == INT || token == CHAR) { // First of <DeclareStatement>
         declare_statement();
-        match(SEMI);
+        if(!match(SEMI))
+        {
+            int follow_set[] = {IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE};
+            char error_msg[200];
+            sprintf(error_msg, "Expected ';' after declaration statement, got %s",
+                    token_type_to_string(token));
+            save_error_pos("syntax error", error_msg);
+            error_recovery(follow_set, 8, "statement");
+        }
         return;
     } 
     if (token == LBRACE) { // First of <CompoundStatement>
-        compound_statement(); // CompoundStatement in EBNF for statement does not have a trailing semicolon
+        compound_statement();        
         return;
     }
     if(token == IDENTIFIER) { // First of <Identifier> <AssignOrFuncCall>
-        match(IDENTIFIER); // Match the identifier first
-        assign_or_func_call(); // Then handle assignment or function call
-        match(SEMI);
+        match(IDENTIFIER);
+        assign_or_func_call();
+        if(!match(SEMI))
+        {
+            int follow_set[] = {IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE};
+            char error_msg[200];
+            sprintf(error_msg, "Expected ';' after declaration statement, got %s",
+                    token_type_to_string(token));
+            save_error_pos("syntax error", error_msg);
+            error_recovery(follow_set, 8, "statement");
+        }
         return;
     }
     if(token == IF) { // First of <IfStatement>
-        if_statement(); // IfStatement in EBNF does not have a trailing semicolon
+        if_statement();
         return;
     }
     if(token == WHILE) { // First of <WhileStatement>
-        while_statement(); // WhileStatement in EBNF does not have a trailing semicolon
+        while_statement();
         return;
     }
     
     // Epsilon production for <Statement>
-    // Follow(<Statement>) = { IDENTIFIER, LBRACE, INT, CHAR, IF, WHILE, RBRACE }
-    // If current token is in Follow(<Statement>), it means an empty statement (epsilon) is valid.
     if (token == RBRACE || // End of a compound statement
         token == IDENTIFIER || // Start of next statement
         token == LBRACE ||     // Start of next compound statement
@@ -352,7 +378,6 @@ void statement() {
 // <AssignmentStatement> ::= <Identifier> = <Expression>
 void assignment_statement() {
     fprintf(log_file, "Parsing <AssignmentStatement>\n");
-    match(IDENTIFIER);
     match(ASSIGN);
     expression();
 }
@@ -363,8 +388,7 @@ void assign_or_func_call() {
     
     // Check for assignment: = <Expression>
     if (token == ASSIGN) {
-        match(ASSIGN);
-        expression();
+        assignment_statement();
         return;
     }
 
@@ -373,13 +397,6 @@ void assign_or_func_call() {
         function_call_statement();
         return;
     }
-
-    int follow_set[] = {SEMI}; // Follow set for <AssignOrFuncCall>
-    char error_msg[200];
-    sprintf(error_msg, "Expected '=' or '(' after identifier, got %s",
-            token_type_to_string(token));
-    save_error_pos("syntax error", error_msg);
-    error_recovery(follow_set, 1, "assign_or_func_call");
 }
 
 // <FunctionCallStatement> ::= <Identifier> ( <ArgumentListOpt> ) ;
@@ -387,7 +404,16 @@ void function_call_statement() {
     fprintf(log_file, "Parsing <FunctionCallStatement>\n");
     match(LPAREN);
     argument_list_opt();
-    match(RPAREN);
+    if(!match(RPAREN))
+    {
+        int follow_set[] = {MUL, DIV, PLUS, MINUS, RPAREN, SEMI, LT, LE, GT, GE, EQ, NE, COMMA}; // Follow set for <FunctionCallStatement>
+        char error_msg[200];
+        sprintf(error_msg, "Expected ')' after function call arguments, got %s",
+                token_type_to_string(token));
+        save_error_pos("syntax error", error_msg);
+        error_recovery(follow_set, 13, "function_call_statement");
+        return;
+    }
 }
 
 // <ArgumentListOpt> ::= <ArgumentList> | epsilon
@@ -398,16 +424,6 @@ void argument_list_opt() {
         argument_list();
         return;
     }
-    // Epsilon production. Follow is RPAREN, already handled by caller or next match.
-    if(token == RPAREN) return;
-
-    // Error handling based on follow set: RPAREN
-    int follow_set[] = {RPAREN};
-    char error_msg[200];
-    sprintf(error_msg, "Expected expression (identifier, number, or '(') or ')' in argument list, got %s",
-            token_type_to_string(token));
-    save_error_pos("syntax error", error_msg);
-    error_recovery(follow_set, 1, "argument_list_opt");
 }
 
 // <ArgumentList> ::= <Expression> { , <Expression> }
@@ -435,7 +451,17 @@ void declare_statement() {
 // <InitDeclarator> ::= <Identifier> [ = <Expression> ]
 void init_declarator() {
     fprintf(log_file, "Parsing <InitDeclarator>\n");
-    match(IDENTIFIER);
+    if(!match(IDENTIFIER))
+    {
+        int follow_set[] = {COMMA, SEMI}; // Follow set for <InitDeclarator>
+        char error_msg[200];
+        sprintf(error_msg, "Expected identifier in initializer, got %s",
+                token_type_to_string(token));
+        save_error_pos("syntax error", error_msg);
+        error_recovery(follow_set, 2, "init_declarator");
+        return;
+    }
+
     if (token == ASSIGN) 
     {
         match(ASSIGN);
@@ -508,10 +534,12 @@ void arithmetic_prime() {
     if(token == RPAREN || token == SEMI || token == LE || token == GE || 
         token == LT || token == GT || token == EQ || token == NE || token == COMMA) return;
 
+    int follow_set[] = {RPAREN, SEMI, LE, GE, LT, GT, EQ, NE, COMMA}; // Follow set for <ArithmeticPrime>
     char error_msg[200];
     sprintf(error_msg, "Unexpected token %s in expression prime",
             token_type_to_string(token));
     save_error_pos("syntax error", error_msg);
+    error_recovery(follow_set, 9, "arithmetic_prime");
 }
 
 // <RelationalPrime> ::= == <ArithmeticExpression> <RelationalPrime>
@@ -565,10 +593,12 @@ void relational_prime() {
         return;
     }
 
+    int follow_set[] = {RPAREN, SEMI, COMMA}; // Follow set for <RelationalPrime>
     char error_msg[200];
     sprintf(error_msg, "Unexpected token %s in relational prime",
             token_type_to_string(token));
     save_error_pos("syntax error", error_msg);
+    error_recovery(follow_set, 3, "relational_prime");
 }
 
 // <Term> ::= <Factor> <TermPrime>
@@ -600,10 +630,12 @@ void term_prime() {
     if(token == PLUS || token == MINUS || token == RPAREN || token == SEMI || token == LE || token == GE || 
         token == LT || token == GT || token == EQ || token == NE || token == COMMA) return;
 
+    int follow_set[] = {PLUS, MINUS, RPAREN, SEMI, LE, GE, LT, GT, EQ, NE, COMMA}; // Follow set for <TermPrime>
     char error_msg[200];
     sprintf(error_msg, "Unexpected token %s in term prime",
             token_type_to_string(token));
     save_error_pos("syntax error", error_msg);
+    error_recovery(follow_set, 11, "term_prime");
 }
 
 // <Factor> ::= <Identifier> <EpsilonOrFuncCall> | <Number> | ( <Expression> )
@@ -627,10 +659,12 @@ void factor() {
         return;
     } 
 
+    int follow_set[] = {PLUS, MINUS, MUL, DIV, RPAREN, SEMI, LE, GE, LT, GT, EQ, NE, COMMA}; // Follow set for <Factor>
     char error_msg[200];
     sprintf(error_msg, "Unexpected token %s in factor",
             token_type_to_string(token));
     save_error_pos("syntax error", error_msg);
+    error_recovery(follow_set, 13, "factor");
 }
 
 // <EpsilonOrFuncCall> ::= epsilon | <FunctionCallStatement>
@@ -651,10 +685,12 @@ void epsilon_or_func_call() {
         return;
     }
 
+    int follow_set[] = {MUL, DIV, PLUS, MINUS, RPAREN, SEMI, LT, LE, GT, GE, EQ, NE, COMMA}; // Follow set for <EpsilonOrFuncCall>
     char error_msg[200];
     sprintf(error_msg, "Unexpected token %s after identifier in factor",
             token_type_to_string(token));
     save_error_pos("syntax error", error_msg);
+    error_recovery(follow_set, 13, "epsilon_or_func_call");
 }
 
 // <IfStatement> ::= if ( <Expression> ) <CompoundStatement> [ else <CompoundStatement> ]
@@ -662,9 +698,27 @@ void if_statement()
 {
     fprintf(log_file, "Parsing <IfStatement> (current token: %s)\n", token_type_to_string(token));
     match(IF);
-    match(LPAREN);
+    if(!match(LPAREN))
+    {
+        int follow_set[] = {IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE}; // Follow set for <IfStatement>
+        char error_msg[200];
+        sprintf(error_msg, "Expected '(' after 'if', got %s",
+                token_type_to_string(token));
+        save_error_pos("syntax error", error_msg);
+        error_recovery(follow_set, 8, "if_statement");
+        return;
+    }
     expression();
-    match(RPAREN);
+    if(!match(RPAREN))
+    {
+        int follow_set[] = {IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE}; // Follow set for <IfStatement>
+        char error_msg[200];
+        sprintf(error_msg, "Expected '(' after 'if', got %s",
+                token_type_to_string(token));
+        save_error_pos("syntax error", error_msg);
+        error_recovery(follow_set, 8, "if_statement");
+        return;
+    }
     compound_statement();
     if (token == ELSE) {
         match(ELSE);
@@ -677,9 +731,27 @@ void while_statement()
 {
     fprintf(log_file, "Parsing <WhileStatement> (current token: %s)\n", token_type_to_string(token));
     match(WHILE);
-    match(LPAREN);
+    if(!match(LPAREN))
+    {
+        int follow_set[] = {IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE}; // Follow set for <WhileStatement>
+        char error_msg[200];
+        sprintf(error_msg, "Expected '(' after 'while', got %s",
+                token_type_to_string(token));
+        save_error_pos("syntax error", error_msg);
+        error_recovery(follow_set, 8, "while_statement");
+        return;
+    }
     expression();
-    match(RPAREN);
+    if(!match(RPAREN))
+    {
+        int follow_set[] = {IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE}; // Follow set for <WhileStatement>
+        char error_msg[200];
+        sprintf(error_msg, "Expected ')' after expression in 'while', got %s",
+                token_type_to_string(token));
+        save_error_pos("syntax error", error_msg);
+        error_recovery(follow_set, 8, "while_statement");
+        return;
+    }
     compound_statement();
 }
 
@@ -689,7 +761,7 @@ void parse() {
     get_next_token(); // Initialize current_token
     program(); // Start parsing from the <Program> rule
 
-    if (token == 0) 
+    if (token == EOF) 
     {
         printf("Parsing reached EOF as expected.\n");
         return;

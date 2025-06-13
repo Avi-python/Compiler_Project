@@ -1,6 +1,7 @@
 #ifndef TOKENS_H
 #define TOKENS_H
 
+#define EOF             0
 #define error           1
 #define IDENTIFIER      2
 #define NUMBER          3
