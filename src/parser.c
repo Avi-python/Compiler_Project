@@ -64,9 +64,9 @@ int is_in_follow_set(int* follow_set, int size) {
 
 // Error recovery function - skip tokens until we find one in the follow set
 void error_recovery(int* follow_set, int size, const char* production_name) {
-    char error_msg[300];
-    sprintf(error_msg, "Error recovery in %s: skipping tokens until valid follow token", production_name);
-    save_error_pos("syntax error", error_msg);
+    // char error_msg[300];
+    // sprintf(error_msg, "Error recovery in %s: skipping tokens until valid follow token", production_name);
+    // save_error_pos("syntax error", error_msg);
     
     while (token != 0 && !is_in_follow_set(follow_set, size)) {
         fprintf(log_file, "Skipping token: %s during error recovery\n", token_type_to_string(token));

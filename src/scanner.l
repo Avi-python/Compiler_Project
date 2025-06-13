@@ -18,6 +18,8 @@ Error* errors_arr[1024];
 
 %}
 
+%x COMMENT
+
 alpha       [a-zA-Z]
 ws          [ \t]+
 dig         [0-9]
@@ -29,6 +31,18 @@ character   \'([^'])\'
 
 {ws}            { column += yyleng; }
 \n              { lineno++; column = 1; }
+
+"//".*          { column += yyleng; /* Ignore single-line comment */ }
+"/*"            { column += 2; BEGIN(COMMENT); /* Start multi-line comment */ }
+
+<COMMENT>"*/"      { column += 2; BEGIN(INITIAL); /* End multi-line comment */ }
+<COMMENT>\n        { lineno++; column = 1; /* Newline inside comment */ }
+<COMMENT>.         { column++; /* Character inside comment, ignored */ }
+<COMMENT><<EOF>>   { 
+                       save_error_pos("lexical error", "unterminated /* comment"); 
+                       yyterminate(); /* Terminate scanning due to unterminated comment at EOF */
+                   }
+
 "+"             { column += yyleng; return PLUS; }
 "-"             { column += yyleng; return MINUS; }
 "*"             { column += yyleng; return MUL; }
@@ -60,8 +74,8 @@ character   \'([^'])\'
 } 
 
 {number}        { yylval.ival = atoi(yytext); column += yyleng; return NUMBER; } // Assuming yylval.ival is int
-{character}     { yylval.sval = strdup(yytext); column += yyleng; ; return CHAR; } // Assuming yylval.sval is char* for the literal string
-.               { save_error_pos("unexpected character", yylex); column += yyleng;  /* Stilcolumn += yyleng; */ }
+{character}     { yylval.sval = strdup(yytext); column += yyleng; return CHAR; } // Assuming yylval.sval is char* for the literal string
+.               { save_error_pos("unexpected character", yylex); column += yyleng; }
 
 %%
 
