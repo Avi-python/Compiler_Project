@@ -2,6 +2,7 @@
 #define AST_H
 
 #include "symbol.h"
+#include <stdio.h>
 
 typedef enum {
     NODE_PROGRAM,
@@ -146,5 +147,7 @@ ErrorNode* create_error_node();
 
 // Function to free an AST tree
 void free_ast(ASTNode* node);
+void visualize_ast_recursive(ASTNode* node, FILE* fp);
+void visualize_ast(ASTNode* node, const char* filename);
 
 #endif // AST_H

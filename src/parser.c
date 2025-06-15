@@ -54,6 +54,7 @@ sym_t* current_sym_table = NULL;
 int is_in_follow_set(int* follow_set, int size);
 void error_recovery(int* follow_set, int size, const char* production_name);
 char* token_type_to_string(int token_type);
+void get_next_token();
 
 // Helper function to check if token is in follow set
 int is_in_follow_set(int* follow_set, int size) 
@@ -529,7 +530,7 @@ ASTNode* statement_list()
             get_next_token(); 
         }
     }
-    fprintf(log_file, "Exiting <StatementList>. Next token for compound_statement: %s\\n", token_type_to_string(token));
+    fprintf(log_file, "Exiting <StatementList>. Next token for compound_statement: %s\n", token_type_to_string(token));
     return head_stmt_node;
 }
 
@@ -683,7 +684,7 @@ ASTNode* assign_or_func_call(Symbol* id_sym)
 // <FunctionCallStatement> ::= ( <ArgumentListOpt> ) ; (Identifier already matched, passed as id_sym)
 ASTNode* function_call_statement(Symbol* id_sym) 
 {
-    fprintf(log_file, "Parsing <FunctionCallStatement> (current token: %s)\n");
+    fprintf(log_file, "Parsing <FunctionCallStatement> (current token: %s)\n", token_type_to_string(token));
     ASTNode* id_node = (ASTNode*)create_identifier_node(id_sym); // Consumes id_sym
 
     if(!match(LPAREN)) // LPAREN already checked by assign_or_func_call
@@ -714,7 +715,7 @@ ASTNode* function_call_statement(Symbol* id_sym)
 // <ArgumentListOpt> ::= <ArgumentList> | epsilon
 ASTNode* argument_list_opt() 
 {
-    fprintf(log_file, "Parsing <ArgumentListOpt> (current token: %s)\n");
+    fprintf(log_file, "Parsing <ArgumentListOpt> (current token: %s)\n", token_type_to_string(token));
     // FIRST of ArgumentList is FIRST of Expression (ID, NUMBER, LPAREN)
     if (token == IDENTIFIER || token == NUMBER || token == LPAREN) {
         return argument_list();
@@ -984,7 +985,7 @@ ASTNode* term_prime(ASTNode* left_operand)
 // <Factor> ::= <Identifier> <EpsilonOrFuncCall> | <Number> | ( <Expression> )
 ASTNode* factor() 
 {
-    fprintf(log_file, "Parsing <Factor> (current token: %s)\\n", token_type_to_string(token));
+    fprintf(log_file, "Parsing <Factor> (current token: %s)\n", token_type_to_string(token));
     ASTNode* node = NULL;
     if (token == IDENTIFIER) 
     {
@@ -1121,6 +1122,7 @@ ASTNode* if_statement()
 ASTNode* while_statement()
 {
     fprintf(log_file, "Parsing <WhileStatement> (current token: %s)\n", token_type_to_string(token));
+    match(WHILE);
 
     if(!match(LPAREN)) 
     {
@@ -1224,12 +1226,6 @@ int main(int argc, char **argv)
         printf("Parsing completed with %d errors.\n", error_count);
         show_and_free_errors();
     } 
-    else if (ast_root && ast_root->type != NODE_ERROR) // Check if AST root is valid
-    {
-        printf("Parsing completed successfully.\n");
-        // TODO : Here you might want to print/traverse the AST for verification
-        // e.g., print_ast(ast_root); 
-    } 
     else 
     {
         printf("Parsing completed, but AST generation might have failed or resulted in an error node at root.\n");
@@ -1238,6 +1234,7 @@ int main(int argc, char **argv)
     if (ast_root) 
     {
         fprintf(log_file, "AST construction complete. Root type: %d. AST freeing is commented out for now.\n", ast_root->type);
+        visualize_ast(ast_root, "ast_output.dot");
         free_ast(ast_root);
     }
 
