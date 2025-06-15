@@ -1,17 +1,19 @@
-int a, b, c = 13 +  + 5 + 2 * 10;
+int a, b, c = 13 + + 7;
+
+int helper(char x, char y)
+{
+    return x - y;
+}
 
 int helper(int x, int y)
 {
-    while(x < y)
-    {
-        x = x + 1;
-        y = y - 1;
-    }
-    return x;
+    return x + y;
 }
 
 int main()
 {
+    int x;
+    int x, y, z = 2 * a;
     if(a < c)
     {
         b = a + c;
@@ -20,6 +22,5 @@ int main()
     {
         b = a - c;
     }
-    c = helper(a, b);
     return 0;
 }

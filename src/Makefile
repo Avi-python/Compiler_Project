@@ -69,7 +69,7 @@ scanner_test: scanner_test.c $(LEX_C_FILE) $(HEADERS)
 
 # Target to clean up generated files
 clean:
-	rm -f $(TARGET) scanner_test $(LEX_C_FILE) $(RESWORDS_H_FILE) *.o parser_logs.txt
+	rm -f $(TARGET) scanner_test $(LEX_C_FILE) $(RESWORDS_H_FILE) *.o parser_logs.txt ast_output.dot ast.png
 
 # Target to rebuild everything from scratch
 rebuild: clean all

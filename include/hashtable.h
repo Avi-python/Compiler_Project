@@ -196,27 +196,23 @@ void ht_remove(ht_t *table, const char *key)
     }
 }
 
-void ht_show(ht_t* table)
+void ht_show(ht_t* table, int indent_level) 
 {
     if (!table) 
     {
-        printf("Hash table is NULL.\n");
+        printf("%*sHash table is NULL.\n", indent_level * 2, "");
         return;
     }
-    printf("Hash Table Contents (Size: %u, Count: %u):\n", table->size, table->count);
+    printf("%*sHash Table Contents (Size: %u, Count: %u):\n", indent_level * 2, "", table->size, table->count);
     for (unsigned int i = 0; i < table->size; i++) 
     {
-        printf("Bucket %u: ", i);
         ht_entry_t *entry = table->entries[i];
-        if (entry == NULL) 
+        if (entry != NULL) 
         {
-            printf("~empty~\n");
-        }
-        else
-        {
+            printf("%*sBucket %u: ", (indent_level + 1) * 2, "", i);
             while (entry != NULL) 
             {
-                printf("[\"%s\" -> Symbol(Tag: %d, Name: %s)] ", entry->key, entry->value->tag, entry->value->name); // Assuming Symbol has type and name
+                printf("[\"%s\" -> Symbol(Tag: %d, Name: %s)] ", entry->key, entry->value->tag, entry->value->name); 
                 if (entry->next != NULL) 
                 {
                     printf("-> ");
@@ -226,5 +222,4 @@ void ht_show(ht_t* table)
             printf("\n");
         }
     }
-    printf("End of Hash Table Contents.\n");
 }

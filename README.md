@@ -1,125 +1,139 @@
 # C-Like Language Compiler Project
 
-This project is a compiler for a C-like language, developed as a college final homework assignment. It currently features a lexical analyzer (scanner) built with Flex and a system for handling reserved words using gperf.
+This project is a compiler for a C-like language, developed as a college final homework assignment. It features a complete lexical analyzer (scanner), recursive descent parser, Abstract Syntax Tree (AST) construction, and symbol table management.
 
 ## Components
-`
-*   **Lexical Analyzer (Scanner)**: Implemented in [`src/scanner.l`](/home/avibun/Programming/CPP/Compiler_Project/src/scanner.l) using Flex. It tokenizes the input source code according to the language's grammar. Token definitions can be found in [`src/tokens.h`](/home/avibun/Programming/CPP/Compiler_Project/src/tokens.h).
-*   **Reserved Word Handling**: Uses gperf to efficiently look up reserved words. The gperf input file is [`src/reswords.gperf`](/home/avibun/Programming/CPP/Compiler_Project/src/reswords.gperf), and the generated C code is in [`src/reswords.h`](/home/avibun/Programming/CPP/Compiler_Project/src/reswords.h).
-*   **Error Handling**: Basic error reporting for unrecognized tokens is implemented in the scanner. Error structures are defined in [`src/error.h`](/home/avibun/Programming/CPP/Compiler_Project/src/error.h).
-*   **Parser**: A placeholder for the parser exists in [`src/parser.c`](/home/avibun/Programming/CPP/Compiler_Project/src/parser.c).
-*   **Language Grammar Sketches**: Several EBNF files ([`src/c_avi.ebnf`](/home/avibun/Programming/CPP/Compiler_Project/src/c_avi.ebnf), [`src/c_chubek.ebnf`](/home/avibun/Programming/CPP/Compiler_Project/src/c_chubek.ebnf), [`src/c_sketch.ebnf`](/home/avibun/Programming/CPP/Compiler_Project/src/c_sketch.ebnf), [`src/plone.ebnf`](/home/avibun/Programming/CPP/Compiler_Project/src/plone.ebnf)) outline different aspects or versions of the language grammar.
 
-## Building the Scanner
+*   **Lexical Analyzer (Scanner)**: Implemented in [`src/scanner.l`](/home/avibun/Programming/CPP/Compiler_Project/src/scanner.l) using Flex. It tokenizes the input source code according to the language's grammar. Token definitions can be found in [`include/tokens.h`](/home/avibun/Programming/CPP/Compiler_Project/include/tokens.h).
 
-The scanner and its test program can be built using the Makefile provided in the `src` directory.
+*   **Recursive Descent Parser**: A complete recursive descent parser implemented in [`src/parser.c`](/home/avibun/Programming/CPP/Compiler_Project/src/parser.c) that builds an Abstract Syntax Tree (AST) from the token stream. The parser follows the grammar defined in [`src/c_avi.ebnf`](/home/avibun/Programming/CPP/Compiler_Project/src/c_avi.ebnf).
+
+*   **Abstract Syntax Tree (AST)**: AST node structures and creation functions are defined in [`include/ast.h`](/home/avibun/Programming/CPP/Compiler_Project/include/ast.h) and implemented in [`src/ast.c`](/home/avibun/Programming/CPP/Compiler_Project/src/ast.c). The AST supports visualization through DOT graph generation for debugging purposes.
+
+*   **Symbol Table Management**: Symbol table implementation with hash table backend located in [`include/symbol_table.h`](/home/avibun/Programming/CPP/Compiler_Project/include/symbol_table.h), [`include/hashtable.h`](/home/avibun/Programming/CPP/Compiler_Project/include/hashtable.h), and [`src/symbol.c`](/home/avibun/Programming/CPP/Compiler_Project/src/symbol.c).
+
+*   **Reserved Word Handling**: Uses gperf to efficiently look up reserved words. The gperf input file is [`src/reswords.gperf`](/home/avibun/Programming/CPP/Compiler_Project/src/reswords.gperf), and the generated C code is in `src/reswords.h`.
+
+*   **Error Handling**: Comprehensive error reporting for lexical and syntax errors. Error structures are defined in [`include/error.h`](/home/avibun/Programming/CPP/Compiler_Project/include/error.h) with detailed error recovery mechanisms in the parser.
+
+*   **Language Grammar**: The complete EBNF grammar is defined in [`src/c_avi.ebnf`](/home/avibun/Programming/CPP/Compiler_Project/src/c_avi.ebnf). Additional grammar sketches are available in other EBNF files for reference.
+
+## Building the Compiler
+
+The compiler can be built using the Makefile provided in the `src` directory.
 
 1.  Navigate to the `src` directory:
     ```sh
     cd src
     ```
-2.  Run make:
+
+2.  Build the main compiler:
+    ```sh
+    make
+    ```
+    This creates the `compiler` executable which includes the lexer, parser, and AST generator.
+
+3.  Alternatively, build just the scanner test:
     ```sh
     make scanner_test
     ```
-    This will compile `scanner.l` and `scanner_test.c` to create an executable `scanner_test`.
 
-## Running the Scanner Test
+4.  Clean build artifacts:
+    ```sh
+    make clean
+    ```
 
-Once built, you can run the `scanner_test` executable with a source file as an argument:
+## Running the Compiler
+
+Once built, you can run the compiler with a source file as an argument:
 
 ```sh
-./scanner_test path/to/your/sourcefile.c
+./compiler path/to/your/sourcefile.c
 ```
 
 For example, to test with the provided [`src/source.c`](/home/avibun/Programming/CPP/Compiler_Project/src/source.c):
 
 ```sh
 # From the src directory
+./compiler source.c
+```
+
+The compiler will:
+- Parse the input file and generate an AST
+- Output parsing results and any errors to the console
+- Generate `ast_output.dot` for AST visualization
+- Create `parser_logs.txt` with detailed parsing information
+
+### Visualizing the AST
+
+To generate a visual representation of the AST:
+
+```sh
+# Generate PNG image from DOT file (requires Graphviz)
+dot -Tpng ast_output.dot -o ast.png
+```
+
+### Running Scanner Only
+
+To test just the lexical analyzer:
+
+```sh
 ./scanner_test source.c
 ```
 
-The program will output the list of tokens found in the input file.
+## Supported Language Features
+
+The compiler supports a C-like language with the following features:
+
+- **Data Types**: `int`, `char`, `void`
+- **Variable Declarations**: Global and local variable declarations with optional initialization
+- **Function Definitions**: Functions with parameters and return values
+- **Control Structures**: `if`/`else` statements, `while` loops
+- **Expressions**: Arithmetic (`+`, `-`, `*`, `/`) and relational operators (`<`, `<=`, `>`, `>=`, `==`, `!=`)
+- **Function Calls**: Function calls with arguments
+- **Assignment Statements**: Variable assignment
+- **Return Statements**: Function return statements
 
 ## Project Structure
 
-*   `.gitignore`: Specifies intentionally untracked files that Git should ignore.
-*   `CMakeLists.txt`: CMake build system file (currently empty).
 *   `README.md`: This file.
-*   `.vscode/`: VS Code editor configuration files ([`launch.json`](/home/avibun/Programming/CPP/Compiler_Project/.vscode/launch.json), [`tasks.json`](/home/avibun/Programming/CPP/Compiler_Project/.vscode/tasks.json)).
-*   `build/`: Directory for build outputs (intended for CMake, currently unused by Makefile).
-*   `include/`: Directory for header files (currently empty, headers are in `src/`).
-*   `src/`: Contains all source code, including the lexer, parser, EBNF files, and Makefiles.
-    *   `Makefile`: Used to build the scanner.
-    *   `scanner.l`: Flex input file for the lexical analyzer.
-    *   `scanner_test.c`: Test program for the scanner.
-    *   `tokens.h`: Defines token types.
-    *   `reswords.gperf`: gperf input for reserved words.
-    *   `reswords.h`: Generated C code for reserved words.
-    *   `error.h`: Defines error structures.
-    *   `parser.c`: Placeholder for the parser.
-    *   `*.ebnf`: EBNF grammar files.
-    *   `source.c`: An example source file for testing.
-```<!-- filepath: /home/avibun/Programming/CPP/Compiler_Project/README.md -->
-# C-Like Language Compiler Project
+*   `CMakeLists.txt`: CMake build system file (currently empty).
+*   `.gitignore`: Specifies intentionally untracked files that Git should ignore.
+*   `include/`: Header files for all components:
+    *   `tokens.h`: Token type definitions
+    *   `ast.h`: AST node structures and function declarations
+    *   `symbol.h`, `symbol_table.h`, `hashtable.h`: Symbol table management
+    *   `error.h`: Error handling structures
+*   `src/`: Contains all source code:
+    *   `Makefile`: Build system for the compiler
+    *   `scanner.l`: Flex input file for the lexical analyzer
+    *   `parser.c`: Recursive descent parser implementation
+    *   `ast.c`: AST creation and manipulation functions
+    *   `symbol.c`: Symbol table implementation
+    *   `scanner_test.c`: Test program for the scanner
+    *   `c_avi.ebnf`: Complete EBNF grammar specification
+    *   `source.c`: Example source file for testing
+    *   `reswords.gperf`: gperf input for reserved words
+*   `test/`: Test files with various error cases:
+    *   `error_1.c`, `error_2.c`, `error_3.c`: Test cases for error handling
+*   `build/`: Directory for build outputs (CMake, currently unused by Makefile)
 
-This project is a compiler for a C-like language, developed as a college final homework assignment. It currently features a lexical analyzer (scanner) built with Flex and a system for handling reserved words using gperf.
+## Development Status
 
-## Components
+- ✅ **Lexical Analysis**: Complete with comprehensive error reporting
+- ✅ **Syntax Analysis**: Recursive descent parser with error recovery
+- ✅ **AST Construction**: Full AST generation with visualization support
+- ✅ **Symbol Table**: Hash table-based symbol management
+- 🚧 **Semantic Analysis**: Planned for future development
+- 🚧 **Code Generation**: Planned for future development
 
-*   **Lexical Analyzer (Scanner)**: Implemented in [`src/scanner.l`](/home/avibun/Programming/CPP/Compiler_Project/src/scanner.l) using Flex. It tokenizes the input source code according to the language's grammar. Token definitions can be found in [`src/tokens.h`](/home/avibun/Programming/CPP/Compiler_Project/src/tokens.h).
-*   **Reserved Word Handling**: Uses gperf to efficiently look up reserved words. The gperf input file is [`src/reswords.gperf`](/home/avibun/Programming/CPP/Compiler_Project/src/reswords.gperf), and the generated C code is in [`src/reswords.h`](/home/avibun/Programming/CPP/Compiler_Project/src/reswords.h).
-*   **Error Handling**: Basic error reporting for unrecognized tokens is implemented in the scanner. Error structures are defined in [`src/error.h`](/home/avibun/Programming/CPP/Compiler_Project/src/error.h).
-*   **Parser**: A placeholder for the parser exists in [`src/parser.c`](/home/avibun/Programming/CPP/Compiler_Project/src/parser.c).
-*   **Language Grammar Sketches**: Several EBNF files ([`src/c_avi.ebnf`](/home/avibun/Programming/CPP/Compiler_Project/src/c_avi.ebnf), [`src/c_chubek.ebnf`](/home/avibun/Programming/CPP/Compiler_Project/src/c_chubek.ebnf), [`src/c_sketch.ebnf`](/home/avibun/Programming/CPP/Compiler_Project/src/c_sketch.ebnf), [`src/plone.ebnf`](/home/avibun/Programming/CPP/Compiler_Project/src/plone.ebnf)) outline different aspects or versions of the language grammar.
+## Testing
 
-## Building the Scanner
-
-The scanner and its test program can be built using the Makefile provided in the `src` directory.
-
-1.  Navigate to the `src` directory:
-    ```sh
-    cd src
-    ```
-2.  Run make:
-    ```sh
-    make scanner_test
-    ```
-    This will compile `scanner.l` and `scanner_test.c` to create an executable `scanner_test`.
-
-## Running the Scanner Test
-
-Once built, you can run the `scanner_test` executable with a source file as an argument:
+The project includes several test files in the `test/` directory to verify error handling capabilities. You can test the compiler with these files to see how it handles various syntax errors and edge cases.
 
 ```sh
-./scanner_test path/to/your/sourcefile.c
+# Test error handling
+./compiler test/error_1.c
+./compiler test/error_2.c
+./compiler test/error_3.c
 ```
-
-For example, to test with the provided [`src/source.c`](/home/avibun/Programming/CPP/Compiler_Project/src/source.c):
-
-```sh
-# From the src directory
-./scanner_test source.c
-```
-
-The program will output the list of tokens found in the input file.
-
-## Project Structure
-
-*   `.gitignore`: Specifies intentionally untracked files that Git should ignore.
-*   `CMakeLists.txt`: CMake build system file (currently empty).
-*   `README.md`: This file.
-*   `.vscode/`: VS Code editor configuration files ([`launch.json`](/home/avibun/Programming/CPP/Compiler_Project/.vscode/launch.json), [`tasks.json`](/home/avibun/Programming/CPP/Compiler_Project/.vscode/tasks.json)).
-*   `build/`: Directory for build outputs (intended for CMake, currently unused by Makefile).
-*   `include/`: Directory for header files (currently empty, headers are in `src/`).
-*   `src/`: Contains all source code, including the lexer, parser, EBNF files, and Makefiles.
-    *   `Makefile`: Used to build the scanner.
-    *   `scanner.l`: Flex input file for the lexical analyzer.
-    *   `scanner_test.c`: Test program for the scanner.
-    *   `tokens.h`: Defines token types.
-    *   `reswords.gperf`: gperf input for reserved words.
-    *   `reswords.h`: Generated C code for reserved words.
-    *   `error.h`: Defines error structures.
-    *   `parser.c`: Placeholder for the parser.
-    *   `*.ebnf`: EBNF grammar files.
-    *   `source.c`: An example source file for testing.

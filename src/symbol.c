@@ -34,7 +34,7 @@ Symbol* copy_sym(Symbol *s)
     if (!copy) 
     {
         perror("Failed to allocate memory for Symbol copy");
-        return;
+        return NULL;
     }
 
     copy->name = strdup(s->name);
@@ -42,7 +42,7 @@ Symbol* copy_sym(Symbol *s)
     {
         perror("Failed to duplicate name for Symbol copy");
         free(copy);
-        return;
+        return NULL;
     }
 
     copy->tag = s->tag;

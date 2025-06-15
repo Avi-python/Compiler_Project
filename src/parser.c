@@ -50,6 +50,7 @@ YYSTYPE yylval;
 int token;
 ASTNode* ast_root = NULL;
 sym_t* current_sym_table = NULL;
+sym_t* global_sym_table = NULL;
 
 int is_in_follow_set(int* follow_set, int size);
 void error_recovery(int* follow_set, int size, const char* production_name);
@@ -202,11 +203,21 @@ ASTNode* external_declaration()
     Symbol* id_sym = NULL;
     if (token == IDENTIFIER) 
     {
-        id_sym = insert_symbol(current_sym_table, yylval.sval, token);
-        if (!id_sym) {
-            perror("Failed to create symbol for identifier");
-            free_ast(type_node);
-            return (ASTNode*)create_error_node();
+        // check if the identifier is already declared in the current scope
+        if (check_symbol_in_current_scope(current_sym_table, yylval.sval)) 
+        {
+            char error_msg[200];
+            sprintf(error_msg, "Redeclaration of identifier '%s'", yylval.sval);
+            save_error_pos("semantic error", error_msg);
+        }
+        else
+        {
+            id_sym = insert_symbol(current_sym_table, yylval.sval, token);
+            if (!id_sym) {
+                perror("Failed to create symbol for identifier");
+                free_ast(type_node);
+                return (ASTNode*)create_error_node();
+            }
         }
         match(IDENTIFIER);
     } 
@@ -280,7 +291,10 @@ ASTNode* variable_declaration_global_body(ASTNode* type_node, Symbol* first_var_
     }
 
     ASTNode* current_declarator_item = NULL;
-    ASTNode* first_id_node = (ASTNode*)create_identifier_node(first_var_sym); // Consumes first_var_sym
+    ASTNode* first_id_node = NULL;
+    if(!first_var_sym) first_id_node = (ASTNode*)create_error_node();
+    else               first_id_node = (ASTNode*)create_identifier_node(first_var_sym);
+
     ASTNode* first_expr_node = NULL;
     if (token == ASSIGN) 
     {
@@ -297,6 +311,14 @@ ASTNode* variable_declaration_global_body(ASTNode* type_node, Symbol* first_var_
         Symbol* next_var_sym = NULL;
         if (token == IDENTIFIER) 
         {
+            if(check_symbol_in_current_scope(current_sym_table, yylval.sval))
+            {
+                char error_msg[200];
+                sprintf(error_msg, "Redeclaration of identifier '%s'", yylval.sval);
+                save_error_pos("semantic error", error_msg);
+                free_ast((ASTNode*)gvd_node);
+                return (ASTNode*)create_error_node();
+            }
             next_var_sym = insert_symbol(current_sym_table, yylval.sval, token);
             match(IDENTIFIER);
         } 
@@ -328,18 +350,21 @@ ASTNode* variable_declaration_global_body(ASTNode* type_node, Symbol* first_var_
 // <FunctionDefinition> ::= ( <ParameterListOpt> ) <CompoundStatement>
 ASTNode* function_definition_body(ASTNode* type_node, Symbol* func_sym) 
 {
-    fprintf(log_file, "Parsing <FunctionDefinitionBody>\n");
-    if (!match(LPAREN)) 
-    { // LPAREN is already checked by caller (declarations)
-        // This case should ideally not be hit if declarations() checks LPAREN first.
-        // For robustness:
-        char error_msg[200];
-        sprintf(error_msg, "Expected \'(\' to start function definition parameters, got %s", token_type_to_string(token));
-        save_error_pos("syntax error", error_msg);
-        // Recovery for LPAREN might be complex here.
-        free_ast(type_node); free_sym(func_sym);
-        return (ASTNode*)create_error_node();
-    }
+    fprintf(log_file, "Enter <FunctionDefinitionBody> for '%s'. Outer scope: depth %d, addr %p\n",
+            func_sym == NULL ? "NULL" : func_sym->name, current_sym_table->depth, (void*)current_sym_table);
+
+    sym_t* scope_where_func_is_declared = current_sym_table;
+    sym_t* function_scope = create_symbol_table(); // Scope for parameters and function locals' first level
+    // TODO : error handling
+
+    match(LPAREN);
+
+    function_scope->parent = scope_where_func_is_declared;
+    function_scope->depth = scope_where_func_is_declared->depth + 1;
+    current_sym_table = function_scope; // Enter function's own scope
+
+    fprintf(log_file, "Entered function scope for '%s'. New depth: %d, addr: %p, parent: %p\n",
+            func_sym == NULL ? "NULL" : func_sym->name, current_sym_table->depth, (void*)current_sym_table, (void*)current_sym_table->parent);
 
     ASTNode* params_list_node = parameter_list_opt();
 
@@ -352,14 +377,25 @@ ASTNode* function_definition_body(ASTNode* type_node, Symbol* func_sym)
         error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "function_definition_rparen");
         // If RPAREN is missing, proceed if recovery finds LBRACE, otherwise error.
         if (token != LBRACE) {
+            free_all_symbol_tables(function_scope);
             free_ast(type_node); free_sym(func_sym); free_ast(params_list_node);
             return (ASTNode*)create_error_node();
         }
     }
 
     ASTNode* body_node = compound_statement();
-    ASTNode* func_id_node = (ASTNode*)create_identifier_node(func_sym);
-    return (ASTNode*)create_function_definition_node(type_node, func_id_node, params_list_node, body_node);
+    ASTNode* func_id_node;
+    if(func_sym) func_id_node = (ASTNode*)create_identifier_node(func_sym);
+    else         func_id_node = (ASTNode*)create_error_node();
+
+    FunctionDefinitionNode* fdn_node = create_function_definition_node(type_node, func_id_node, params_list_node, body_node);
+
+    add_child_symbol_table(scope_where_func_is_declared, function_scope); 
+    current_sym_table = scope_where_func_is_declared;
+    fprintf(log_file, "Exit <FunctionDefinitionBody> for '%s'. Restored scope: depth %d, addr %p\\n",
+            func_sym == NULL ? "NULL" : func_sym->name, current_sym_table->depth, (void*)current_sym_table);
+
+    return (ASTNode*)fdn_node;
 }
 
 // <ParameterListOpt> ::= <ParameterList> | epsilon
@@ -398,12 +434,21 @@ ASTNode* parameter_list()
 // <ParameterDeclaration> ::= <Type> <Identifier>
 ASTNode* parameter_declaration() 
 {
-    fprintf(log_file, "Parsing <ParameterDeclaration>\\n");
+    fprintf(log_file, "Parsing <ParameterDeclaration>. Current scope: depth %d, addr %p\n",
+            current_sym_table->depth, (void*)current_sym_table);
     ASTNode* type_node = type();
 
     Symbol* param_sym = NULL;
     if (token == IDENTIFIER) 
     {
+        if(check_symbol_in_current_scope(current_sym_table, yylval.sval))
+        {
+            char error_msg[200];
+            sprintf(error_msg, "Redeclaration of identifier '%s'", yylval.sval);
+            save_error_pos("semantic error", error_msg);
+            free_ast((ASTNode*)type_node);
+            return (ASTNode*)create_error_node();
+        }
         param_sym = insert_symbol(current_sym_table, yylval.sval, token);
         match(IDENTIFIER);
     } 
@@ -449,6 +494,16 @@ ASTNode* compound_statement()
 {
     fprintf(log_file, "Parsing <CompoundStatement>. Current token: %s\n", token_type_to_string(token));
 
+    sym_t* outer_scope = current_sym_table;
+    sym_t* new_block_scope = create_symbol_table(); // TODO : error handling
+
+    new_block_scope->parent = outer_scope;
+    new_block_scope->depth = outer_scope->depth + 1;
+    current_sym_table = new_block_scope;
+
+    fprintf(log_file, "Entered new block scope. New depth: %d, addr: %p, parent: %p\\n",
+            current_sym_table->depth, (void*)current_sym_table, (void*)current_sym_table->parent);
+
     if(!match(LBRACE))
     {
         int follow_set[] = {EOF, IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE, ELSE, RETURN};
@@ -456,9 +511,15 @@ ASTNode* compound_statement()
         sprintf(error_msg, "Expected \'{\' to start compound statement, got %s", token_type_to_string(token));
         save_error_pos("syntax error", error_msg);
         error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "compound_statement_missing_lbrace");
-        if (token != LBRACE) return (ASTNode*)create_error_node(); 
+        if(token != LBRACE)
+        {
+            current_sym_table = outer_scope;
+            free_all_symbol_tables(new_block_scope); 
+            return (ASTNode*)create_error_node(); 
+        }
         match(LBRACE); // If recovery found LBRACE, consume it.
     }
+
     ASTNode* stmt_list_node = statement_list(); // Can be NULL if empty list
     
     if(!match(RBRACE))
@@ -474,16 +535,25 @@ ASTNode* compound_statement()
         // Depending on strictness, could return error or proceed.
         // For now, let's assume recovery positions for next statement.
         // If we want to be strict, and RBRACE is not found after recovery:
-        if (token != RBRACE) { // Check if match(RBRACE) would fail after recovery
-             free_ast(stmt_list_node);
+        if(token != RBRACE) 
+        { // Check if match(RBRACE) would fail after recovery
+            current_sym_table = outer_scope;
+            free_all_symbol_tables(new_block_scope); 
+            free_ast(stmt_list_node);
              return (ASTNode*)create_error_node();
         }
         // If recovery found RBRACE, it will be matched by the earlier match(RBRACE) call if it was re-attempted,
         // or the logic needs adjustment. The current match() is outside this if.
         // The original code just proceeds. Let's stick to that for now.
     }
-    fprintf(log_file, "Exiting <CompoundStatement>. Current token: %s\n", token_type_to_string(token));
-    return (ASTNode*)create_compound_statement_node(stmt_list_node);
+
+    CompoundStatementNode* cs_node = create_compound_statement_node(stmt_list_node);
+
+    add_child_symbol_table(outer_scope, new_block_scope);
+    current_sym_table = outer_scope;
+    fprintf(log_file, "Exit <CompoundStatement>. Restored scope: depth %d, addr %p. Token: %s\\n",
+            current_sym_table->depth, (void*)current_sym_table, token_type_to_string(token));
+    return (ASTNode*)cs_node;
 }
 
 
@@ -635,7 +705,7 @@ ASTNode* statement()
     // Epsilon production for <Statement> or start of next valid statement
     if (is_in_follow_set(stmt_follow_set, stmt_follow_set_size)) 
     {
-        fprintf(log_file, "Epsilon production for <Statement> or at valid follow token: %s\\n", token_type_to_string(token));
+        fprintf(log_file, "Epsilon production for <Statement> or at valid follow token: %s\n", token_type_to_string(token));
         return NULL;
     }
 
@@ -778,11 +848,25 @@ ASTNode* declare_statement()
 // <InitDeclarator> ::= <Identifier> [ = <Expression> ]
 ASTNode* init_declarator() 
 {
-    fprintf(log_file, "Parsing <InitDeclarator> (current token: %s)\n", token_type_to_string(token));
+    fprintf(log_file, "Parsing <InitDeclarator>. Current scope: depth %d, addr %p\n",
+            current_sym_table->depth, (void*)current_sym_table);
     Symbol* var_sym = NULL;
     if (token == IDENTIFIER) 
     {
-        var_sym = insert_symbol(current_sym_table, yylval.sval, token);
+        if (check_symbol_in_current_scope(current_sym_table, yylval.sval)) 
+        {
+            char error_msg[200];
+            sprintf(error_msg, "Redeclaration of identifier '%s'", yylval.sval);
+            save_error_pos("semantic error", error_msg);
+        }
+        else
+        {
+            var_sym = insert_symbol(current_sym_table, yylval.sval, token);
+            if (!var_sym) {
+                perror("Failed to create symbol for identifier");
+                return (ASTNode*)create_error_node();
+            }
+        }
         match(IDENTIFIER);
     } 
     else 
@@ -796,7 +880,10 @@ ASTNode* init_declarator()
         return (ASTNode*)create_error_node();
     }
     
-    ASTNode* id_node = (ASTNode*)create_identifier_node(var_sym); // Consumes var_sym
+    ASTNode* id_node = NULL;
+    if(var_sym) id_node = (ASTNode*)create_identifier_node(var_sym);
+    else        id_node = (ASTNode*)create_error_node();
+
     ASTNode* expr_node = NULL;
 
     if (token == ASSIGN) 
@@ -985,14 +1072,20 @@ ASTNode* term_prime(ASTNode* left_operand)
 // <Factor> ::= <Identifier> <EpsilonOrFuncCall> | <Number> | ( <Expression> )
 ASTNode* factor() 
 {
-    fprintf(log_file, "Parsing <Factor> (current token: %s)\n", token_type_to_string(token));
+    fprintf(log_file, "Parsing <Factor>. Current scope: depth %d, addr %p. Token: %s\n",
+            current_sym_table->depth, (void*)current_sym_table, token_type_to_string(token));
     ASTNode* node = NULL;
     if (token == IDENTIFIER) 
     {
-        Symbol* sym = insert_symbol(current_sym_table, yylval.sval, token);
-        if (!sym) { perror("Failed to create symbol in factor"); return (ASTNode*)create_error_node(); }
+        Symbol* found_sym = get_symbol(current_sym_table, yylval.sval);
+        if (!found_sym) {
+            char error_msg[256];
+            sprintf(error_msg, "Identifier '%s' not declared in this scope (or parent scopes).", yylval.sval);
+            save_error_pos("semantic error", error_msg); // This is a semantic error.
+            return (ASTNode*)create_error_node();
+        }
         match(IDENTIFIER);
-        node = (ASTNode*)epsilon_or_func_call_from_sym(sym);
+        node = (ASTNode*)epsilon_or_func_call_from_sym(found_sym);
     } 
     else if (token == NUMBER) 
     {
@@ -1171,8 +1264,6 @@ ASTNode* return_statement()
 // --- Main Driver ---
 void parse() 
 {
-    current_sym_table = create_symbol_table(); // Initialize symbol table
-
     get_next_token();
     ast_root = program();
 
@@ -1218,6 +1309,19 @@ int main(int argc, char **argv)
         yyin = stdin;
     }
 
+    global_sym_table = create_symbol_table();
+    if(!global_sym_table)
+    {
+        perror("FATAL: Could not create global symbol table!");
+        if(log_file) fclose(log_file);
+        return 1;
+    }
+    global_sym_table->parent = NULL;
+    global_sym_table->depth = 0;
+    current_sym_table = global_sym_table;
+    fprintf(log_file, "Initialized global scope. Depth: %d, Addr: %p\\n",
+            current_sym_table->depth, (void*)current_sym_table);
+
     parse();
 
 
@@ -1238,9 +1342,19 @@ int main(int argc, char **argv)
         free_ast(ast_root);
     }
 
-    // TODO : Now I free here, but actually it will be free after semantic analysis ( traverse through AST )
-    show_symbol_table(current_sym_table);
-    free_symbol_table(current_sym_table);
+    // Display the entire symbol table tree from the root
+    if (global_sym_table) 
+    {
+        printf("Attempting to display entire symbol tree:\n"); // Debug print
+        show_entire_symbol_tree(global_sym_table);
+    } 
+    else 
+    {
+        printf("current_sym_table is NULL, cannot display tree.\n"); // Debug print
+    }
+
+    // Free all symbol tables (root and all its children)
+    free_all_symbol_tables(global_sym_table);
 
 
     fclose(log_file);
