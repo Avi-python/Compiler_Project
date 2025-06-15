@@ -2,40 +2,39 @@
 #include <stdlib.h>
 #include <string.h>
 #include "tokens.h"
+#include "ast.h"
+#include "symbol_table.h"
 
-// Forward declarations for recursive functions
-void program();
-void external_declaration();
-void declarations();
-void function_definition();
-void variable_declaration_global();
-void parameter_list_opt();
-void parameter_list();
-void parameter_declaration();
-void block();
-void compound_statement();
-void statement_list();
-void statement();
-void assign_or_func_call();
-void assignment_statement();
-void function_call_statement();
-void argument_list_opt();
-void argument_list();
-void declare_statement();
-void init_declarator();
-void expression();
-void expression_prime();
-void arithmetic_expression();
-void arithmetic_prime();
-void relational_prime();
-void term();
-void term_prime();
-void factor();
-void epsilon_or_func_call();
-void type();
-void if_statement();
-void while_statement();
-void return_statement();
+ASTNode* program();
+ASTNode* external_declaration();
+ASTNode* declarations(ASTNode* type_node, Symbol* id_sym);
+ASTNode* function_definition_body(ASTNode* type_node, Symbol* func_sym); // New helper, returns ASTNode*
+ASTNode* variable_declaration_global_body(ASTNode* type_node, Symbol* first_var_sym); // New helper, returns ASTNode*
+ASTNode* parameter_list_opt();
+ASTNode* parameter_list();
+ASTNode* parameter_declaration();
+ASTNode* compound_statement();
+ASTNode* statement_list();
+ASTNode* statement();
+ASTNode* assign_or_func_call(Symbol* id_sym);
+ASTNode* assignment_statement(Symbol* id_sym);
+ASTNode* function_call_statement(Symbol* id_sym);
+ASTNode* argument_list_opt();
+ASTNode* argument_list();
+ASTNode* declare_statement();
+ASTNode* init_declarator();
+ASTNode* expression();
+ASTNode* arithmetic_expression();
+ASTNode* arithmetic_prime(ASTNode* left_operand);
+ASTNode* relational_prime(ASTNode* left_operand);
+ASTNode* term();
+ASTNode* term_prime(ASTNode* left_operand);
+ASTNode* factor();
+ASTNode* epsilon_or_func_call_from_sym(Symbol* sym);
+ASTNode* type();
+ASTNode* if_statement();
+ASTNode* while_statement();
+ASTNode* return_statement();
 
 FILE *log_file; // Log file for parser output
 
@@ -49,6 +48,8 @@ extern void show_and_free_errors();
 
 YYSTYPE yylval;
 int token;
+ASTNode* ast_root = NULL;
+sym_t* current_sym_table = NULL;
 
 int is_in_follow_set(int* follow_set, int size);
 void error_recovery(int* follow_set, int size, const char* production_name);
@@ -68,7 +69,8 @@ int is_in_follow_set(int* follow_set, int size)
 }
 
 // Error recovery function - skip tokens until we find one in the follow set
-void error_recovery(int* follow_set, int size, const char* production_name) {
+void error_recovery(int* follow_set, int size, const char* production_name) 
+{
     fprintf(log_file, "Attempting error recovery in %s. Current token: %s. Skipping until one of: [",
             production_name, token_type_to_string(token));
 
@@ -145,153 +147,279 @@ int match(int expected_type)
 }
 
 // <Program> ::= <ExternalDeclaration> { <ExternalDeclaration> }
-void program() 
+ASTNode* program() 
 {
     fprintf(log_file, "Parsing <Program>\n");
 
-    while (1) { // First of <ExternalDeclaration> is First of <Type>
-        external_declaration();
-        if(token != INT && token != CHAR && token != VOID && token != EOF) 
+    ProgramNode* program_node = create_program_node(NULL);
+    ASTNode* current_decl_list_item = NULL;
+
+    while (1) 
+    {
+        // Check FIRST set of <ExternalDeclaration> (INT, CHAR, VOID)
+        if (token != INT && token != CHAR && token != VOID) 
         {
-            int follow_set[] = {INT, CHAR, VOID, EOF}; // Follow set for <Program>
+            if (token == EOF) break; // Successfully reached EOF
+
+            int follow_set[] = {INT, CHAR, VOID, EOF};
             char error_msg[200];
-            sprintf(error_msg, "Unexpected token %s after external declaration",
+            sprintf(error_msg, "Unexpected token %s at start of or between external declarations",
                     token_type_to_string(token));
             save_error_pos("syntax error", error_msg);
             error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "program");
+            if (token == EOF) break; // EOF after recovery
+            if (token != INT && token != CHAR && token != VOID) continue; // Skip if recovery didn't find a start
         }
-        if(token == EOF) break;
-    }
 
+        ASTNode* decl_node = external_declaration();
+        if (decl_node) 
+        {
+            if (program_node->start == NULL) 
+            {
+                program_node->start = decl_node;
+                current_decl_list_item = decl_node;
+            } 
+            else 
+            {
+                current_decl_list_item->next = decl_node;
+                current_decl_list_item = decl_node;
+            }
+        }
+        
+        // If external_declaration consumed EOF or an error occurred and token is EOF
+        if (token == EOF) break;
+    }
+    return (ASTNode*)program_node;
 }
 
 // <ExternalDeclaration> ::= <Type> <Identifier> <Declarations>
-void external_declaration() 
+ASTNode* external_declaration() 
 {
     fprintf(log_file, "Parsing <ExternalDeclaration>\n");
-    type();
-    if(!match(IDENTIFIER))
+    ASTNode* type_node = type();
+
+    Symbol* id_sym = NULL;
+    if (token == IDENTIFIER) 
     {
-        int follow_set[] = {INT, CHAR, VOID, EOF}; // Follow set for <ExternalDeclaration>
+        id_sym = insert_symbol(current_sym_table, yylval.sval, token);
+        if (!id_sym) {
+            perror("Failed to create symbol for identifier");
+            free_ast(type_node);
+            return (ASTNode*)create_error_node();
+        }
+        match(IDENTIFIER);
+    } 
+    else 
+    {
+        int follow_set[] = {LPAREN, ASSIGN, COMMA, SEMI, INT, CHAR, VOID, EOF}; // Follow of ID or First of Declarations
         char error_msg[200];
         sprintf(error_msg, "Expected identifier after type, got %s",
                 token_type_to_string(token));
         save_error_pos("syntax error", error_msg);
-        error_recovery(follow_set, 4, "external_declaration");
-        return; // Early return on error
+        error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "external_declaration_id");
+        free_ast(type_node);
+        // If recovery doesn't find a suitable token for declarations, or if id_sym is crucial.
+        return (ASTNode*)create_error_node(); 
     }
-    declarations();
+
+    ASTNode* specific_decl_node = declarations(type_node, id_sym);
+    return specific_decl_node;
 }
 
 // <Declarations> ::= <FunctionDefinition> | <VariableDeclarationGlobal> ;
-void declarations() 
+ASTNode* declarations(ASTNode* type_node, Symbol* id_sym) 
 {
     fprintf(log_file, "Parsing <Declarations>\n");
-    if (token == LPAREN) { // First of <FunctionDefinition>
-        function_definition();
-        return;
-    }
-    if (token == ASSIGN || token == COMMA || token == SEMI) { // First of <VariableDeclarationGlobal> or Follow if epsilon
-        variable_declaration_global();
-        if(!match(SEMI))
+    ASTNode* result_node = NULL;
+    if (token == LPAREN) // First of <FunctionDefinition>
+    { 
+        result_node = function_definition_body(type_node, id_sym);
+    } 
+    else if (token == ASSIGN || token == COMMA) 
+    { 
+        result_node = variable_declaration_global_body(type_node, id_sym);
+        if (!match(SEMI)) 
         {
             int follow_set[] = {INT, CHAR, VOID, EOF}; // Follow set for <Declarations>
             char error_msg[200];
-            sprintf(error_msg, "Expected ';' after variable declaration, got %s",
+            sprintf(error_msg, "Expected \';\' after variable declaration, got %s",
                     token_type_to_string(token));
             save_error_pos("syntax error", error_msg);
-            error_recovery(follow_set, 4, "declarations"); 
+            error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "declarations_semi");
+            free_ast(result_node); // Free the result node if it didn't match SEMI
+            result_node = (ASTNode*)create_error_node(); // Create an error node
         }
-        return;
     } 
+    else 
+    {
+        // Unexpected token for declarations
+        int follow_set[] = {INT, CHAR, VOID, EOF};
+        char error_msg[200];
+        sprintf(error_msg, "Unexpected token %s in declarations", token_type_to_string(token));
+        save_error_pos("syntax error", error_msg);
+        error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "declarations_unexpected");
+        free_ast(type_node);
+        return (ASTNode*)create_error_node();
+    }
+    return result_node;
 }
 
-// <VariableDeclarationGlobal> ::= [ = <Expression> ] { , <Identifier> [ = <Expression> ] }
-void variable_declaration_global() 
-{
-    fprintf(log_file, "Parsing <VariableDeclarationGlobal>\n");
-    if (token == ASSIGN) {
-        match(ASSIGN);
-        expression();
-    }
-    while (token == COMMA) {
-        match(COMMA);
-        if(!match(IDENTIFIER))
-        {
-            int follow_set[] = {SEMI}; // Follow set for <VariableDeclarationGlobal>
-            char error_msg[200];
-            sprintf(error_msg, "Expected identifier after ',', got %s",
-                    token_type_to_string(token));
-            save_error_pos("syntax error", error_msg);
-            error_recovery(follow_set, 1, "variable_declaration_global");
-            return;
 
+// <VariableDeclarationGlobal> ::= [ = <Expression> ] { , <Identifier> [ = <Expression> ] }
+ASTNode* variable_declaration_global_body(ASTNode* type_node, Symbol* first_var_sym) 
+{
+    fprintf(log_file, "Parsing <VariableDeclarationGlobalBody>\n");
+    
+    GlobalVariableDeclarationNode* gvd_node = create_global_variable_declaration_node(type_node, NULL);
+    if(!gvd_node)
+    {
+        perror("Failed to create GlobalVariableDeclarationNode");
+        free_ast(type_node);
+        return (ASTNode*)create_error_node();
+    }
+
+    ASTNode* current_declarator_item = NULL;
+    ASTNode* first_id_node = (ASTNode*)create_identifier_node(first_var_sym); // Consumes first_var_sym
+    ASTNode* first_expr_node = NULL;
+    if (token == ASSIGN) 
+    {
+        match(ASSIGN);
+        first_expr_node = expression();
+    }
+    ASTNode* first_decl_node = (ASTNode*)create_variable_declarator_node(first_id_node, first_expr_node);
+    gvd_node->start = first_decl_node;
+    current_declarator_item = first_decl_node;
+
+    while (token == COMMA) 
+    {
+        match(COMMA);
+        Symbol* next_var_sym = NULL;
+        if (token == IDENTIFIER) 
+        {
+            next_var_sym = insert_symbol(current_sym_table, yylval.sval, token);
+            match(IDENTIFIER);
+        } 
+        else 
+        {
+            int follow_set[] = {SEMI, ASSIGN, COMMA}; 
+            char error_msg[200];
+            sprintf(error_msg, "Expected identifier after \',\', got %s", token_type_to_string(token));
+            save_error_pos("syntax error", error_msg);
+            error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "variable_declaration_global_id");
+            free_ast((ASTNode*)gvd_node);
+            return (ASTNode*)create_error_node();
         }
+        
+        ASTNode* next_id_node = (ASTNode*)create_identifier_node(next_var_sym);
+        ASTNode* next_expr_node = NULL;
         if (token == ASSIGN) 
         {
             match(ASSIGN);
-            expression();
+            next_expr_node = expression();
         }
+        ASTNode* next_decl_node = (ASTNode*)create_variable_declarator_node(next_id_node, next_expr_node);
+        current_declarator_item->next = next_decl_node;
+        current_declarator_item = next_decl_node;
     }
+    return (ASTNode*)gvd_node;
 }
 
 // <FunctionDefinition> ::= ( <ParameterListOpt> ) <CompoundStatement>
-void function_definition() 
+ASTNode* function_definition_body(ASTNode* type_node, Symbol* func_sym) 
 {
-    fprintf(log_file, "Parsing <FunctionDefinition>\n");
-    match(LPAREN);
-    parameter_list_opt();
-    if(!match(RPAREN))
-    {
-        int follow_set[] = {INT, CHAR, VOID, EOF}; // Follow set for <FunctionDefinition>
+    fprintf(log_file, "Parsing <FunctionDefinitionBody>\n");
+    if (!match(LPAREN)) 
+    { // LPAREN is already checked by caller (declarations)
+        // This case should ideally not be hit if declarations() checks LPAREN first.
+        // For robustness:
         char error_msg[200];
-        sprintf(error_msg, "Expected ')' after parameter list, got %s",
-                token_type_to_string(token));
+        sprintf(error_msg, "Expected \'(\' to start function definition parameters, got %s", token_type_to_string(token));
         save_error_pos("syntax error", error_msg);
-        error_recovery(follow_set, 4, "function_definition");
-        return;
+        // Recovery for LPAREN might be complex here.
+        free_ast(type_node); free_sym(func_sym);
+        return (ASTNode*)create_error_node();
     }
-    compound_statement();
+
+    ASTNode* params_list_node = parameter_list_opt();
+
+    if (!match(RPAREN)) 
+    {
+        int follow_set[] = {LBRACE, INT, CHAR, VOID, EOF}; // Follow for FuncDef or start of CompoundStmt
+        char error_msg[200];
+        sprintf(error_msg, "Expected \')\' after parameter list, got %s", token_type_to_string(token));
+        save_error_pos("syntax error", error_msg);
+        error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "function_definition_rparen");
+        // If RPAREN is missing, proceed if recovery finds LBRACE, otherwise error.
+        if (token != LBRACE) {
+            free_ast(type_node); free_sym(func_sym); free_ast(params_list_node);
+            return (ASTNode*)create_error_node();
+        }
+    }
+
+    ASTNode* body_node = compound_statement();
+    ASTNode* func_id_node = (ASTNode*)create_identifier_node(func_sym);
+    return (ASTNode*)create_function_definition_node(type_node, func_id_node, params_list_node, body_node);
 }
 
 // <ParameterListOpt> ::= <ParameterList> | epsilon
-void parameter_list_opt() 
+ASTNode* parameter_list_opt() 
 {
-    fprintf(log_file, "Parsing <ParameterListOpt>\n");
-
-    if (token == INT || token == CHAR || token == VOID) {
-        parameter_list();
-        return;
+    fprintf(log_file, "Parsing <ParameterListOpt>\\n");
+    // FIRST of ParameterList is FIRST of ParameterDeclaration, which is FIRST of Type
+    if (token == INT || token == CHAR || token == VOID) 
+    {
+        return parameter_list();
     }
-
+    return NULL; 
 }
 
 // <ParameterList> ::= <ParameterDeclaration> { , <ParameterDeclaration> }
-void parameter_list() 
+ASTNode* parameter_list() 
 {
     fprintf(log_file, "Parsing <ParameterList>\n");
-    parameter_declaration();
-    while (token == COMMA) {
+    ASTNode* head_param_node = NULL;
+    ASTNode* current_param_node = NULL;
+
+    ASTNode* param_decl_node = parameter_declaration();
+    head_param_node = param_decl_node;
+    current_param_node = param_decl_node;
+
+    while (token == COMMA) 
+    {
         match(COMMA);
-        parameter_declaration();
+        param_decl_node = parameter_declaration();
+        current_param_node->next = param_decl_node;
+        current_param_node = param_decl_node;
     }
+    return head_param_node;
 }
 
 // <ParameterDeclaration> ::= <Type> <Identifier>
-void parameter_declaration() 
+ASTNode* parameter_declaration() 
 {
-    fprintf(log_file, "Parsing <ParameterDeclaration>\n");
-    type();
-    if(!match(IDENTIFIER))
+    fprintf(log_file, "Parsing <ParameterDeclaration>\\n");
+    ASTNode* type_node = type();
+
+    Symbol* param_sym = NULL;
+    if (token == IDENTIFIER) 
     {
-        int follow_set[] = {COMMA, RPAREN}; // Follow set for <ParameterDeclaration>
+        param_sym = insert_symbol(current_sym_table, yylval.sval, token);
+        match(IDENTIFIER);
+    } 
+    else 
+    {
+        int follow_set[] = {COMMA, RPAREN}; 
         char error_msg[200];
         sprintf(error_msg, "Expected identifier after type in parameter declaration, got %s",
                 token_type_to_string(token));
         save_error_pos("syntax error", error_msg);
-        error_recovery(follow_set, 2, "parameter_declaration");
-        return;
+        error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "parameter_declaration_id");
+        free_ast(type_node);
+        return (ASTNode*)create_error_node();
     }
+    
+    ASTNode* param_id_node = (ASTNode*)create_identifier_node(param_sym);
+    return (ASTNode*)create_parameter_node(type_node, param_id_node);
 }
 
 
@@ -316,57 +444,93 @@ void block() {
 // The braces themselves are matched by the caller if it's the top-level compound statement of a block,
 // or by statement_parser if it's a compound statement used as a statement.
 // For simplicity, this function will match its own braces.
-void compound_statement() {
+ASTNode* compound_statement() 
+{
     fprintf(log_file, "Parsing <CompoundStatement>. Current token: %s\n", token_type_to_string(token));
+
     if(!match(LBRACE))
     {
-        int follow_set[] = {EOF, IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE, ELSE};
+        int follow_set[] = {EOF, IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE, ELSE, RETURN};
         char error_msg[200];
         sprintf(error_msg, "Expected \'{\' to start compound statement, got %s", token_type_to_string(token));
         save_error_pos("syntax error", error_msg);
         error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "compound_statement_missing_lbrace");
-        // It might be hard to continue meaningfully if LBRACE is missing, but recovery will try.
-        if (token != LBRACE) return; // If recovery didn't find LBRACE, abort this compound_statement.
+        if (token != LBRACE) return (ASTNode*)create_error_node(); 
+        match(LBRACE); // If recovery found LBRACE, consume it.
     }
-    statement_list();
+    ASTNode* stmt_list_node = statement_list(); // Can be NULL if empty list
+    
     if(!match(RBRACE))
     {
-        int follow_set[] = {EOF, IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE, ELSE}; // Follow set for <CompoundStatement>
+        int follow_set[] = {EOF, IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE, ELSE, RETURN};
         char error_msg[200];
         sprintf(error_msg, "Expected \'}\' at end of compound statement, got %s",
                 token_type_to_string(token));
         save_error_pos("syntax error", error_msg);
         error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "compound_statement_missing_rbrace");
-        // No return here, error_recovery will position for the next token.
+        // If RBRACE is still not found, the compound statement is malformed.
+        // stmt_list_node might be valid, but the structure is broken.
+        // Depending on strictness, could return error or proceed.
+        // For now, let's assume recovery positions for next statement.
+        // If we want to be strict, and RBRACE is not found after recovery:
+        if (token != RBRACE) { // Check if match(RBRACE) would fail after recovery
+             free_ast(stmt_list_node);
+             return (ASTNode*)create_error_node();
+        }
+        // If recovery found RBRACE, it will be matched by the earlier match(RBRACE) call if it was re-attempted,
+        // or the logic needs adjustment. The current match() is outside this if.
+        // The original code just proceeds. Let's stick to that for now.
     }
     fprintf(log_file, "Exiting <CompoundStatement>. Current token: %s\n", token_type_to_string(token));
+    return (ASTNode*)create_compound_statement_node(stmt_list_node);
 }
 
 
 // <StatementList> ::= { <Statement> }
-void statement_list() 
+ASTNode* statement_list() 
 {
     fprintf(log_file, "Parsing <StatementList>. Current token: %s\n", token_type_to_string(token));
+    ASTNode* head_stmt_node = NULL;
+    ASTNode* current_stmt_node = NULL;
+
     while(token != RBRACE && token != EOF) 
     {
         int initial_error_count = error_count;
         int initial_token = token;
-        int initial_lineno = yylval.sval ? lineno : -1; // Keep track of line for loop detection
+        int initial_lineno = lineno;
 
-        statement();
+        ASTNode* stmt_node = statement();
 
-        // Failsafe: if statement() didn't advance token and didn't report an error,
-        // and we are not at RBRACE or EOF, we might be in an infinite loop.
+        if (stmt_node) 
+        { 
+            if (head_stmt_node == NULL) 
+            {
+                head_stmt_node = stmt_node;
+                current_stmt_node = stmt_node;
+            } 
+            else 
+            {
+                current_stmt_node->next = stmt_node;
+                current_stmt_node = stmt_node;
+            }
+            // Ensure current_stmt_node points to the actual last node if stmt_node was a list (it shouldn't be)
+            while(current_stmt_node && current_stmt_node->next) current_stmt_node = current_stmt_node->next;
+        }
+        // If stmt_node is NULL (epsilon), do nothing to the list.
+
+        // Failsafe for infinite loop
         if (token == initial_token &&
-            (yylval.sval ? lineno : -1) == initial_lineno && // Check if line number also hasn't changed
+            lineno == initial_lineno && 
             error_count == initial_error_count &&
-            token != RBRACE && token != EOF) {
-            fprintf(log_file, "Internal Parser Error: statement() did not advance token (%s) or report error in statement_list. Forcing advance.\n", token_type_to_string(token));
+            token != RBRACE && token != EOF) 
+        {
+            fprintf(log_file, "Internal Parser Error: statement() did not advance token (%s) or report error in statement_list. Forcing advance.\\n", token_type_to_string(token));
             save_error_pos("internal parser error", "Statement parser stuck, forcing advance.");
-            get_next_token(); // Force advance
+            get_next_token(); 
         }
     }
-    fprintf(log_file, "Exiting <StatementList>. Next token for compound_statement: %s\n", token_type_to_string(token));
+    fprintf(log_file, "Exiting <StatementList>. Next token for compound_statement: %s\\n", token_type_to_string(token));
+    return head_stmt_node;
 }
 
 
@@ -375,273 +539,365 @@ void statement_list()
 //                | <Identifier> <AssignOrFuncCall> ;
 //                | <IfStatement>
 //                | <WhileStatement>
+//                | <ReturnStatement> ;
 //                | epsilon
-void statement() 
+ASTNode* statement() 
 {
-    fprintf(log_file, "Parsing <Statement> (current token: %s, line: %d)\n", token_type_to_string(token), yylval.sval ? lineno : -1);
+    fprintf(log_file, "Parsing <Statement> (current token: %s, line: %d)\n", token_type_to_string(token), lineno);
 
-    int stmt_follow_set[] = {IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE, ELSE, EOF};
+    int stmt_follow_set[] = {IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE, ELSE, RETURN};
     int stmt_follow_set_size = sizeof(stmt_follow_set)/sizeof(stmt_follow_set[0]);
+    ASTNode* stmt_node = NULL;
 
-    if (token == INT || token == CHAR) { // First of <DeclareStatement>
-        declare_statement();
-        if(!match(SEMI)) {
+    // First of <DeclareStatement>
+    if (token == INT || token == CHAR) 
+    { 
+        stmt_node = declare_statement();
+        if(!match(SEMI)) 
+        {
             char error_msg[200];
             sprintf(error_msg, "Expected \';\' after declaration statement, got %s", token_type_to_string(token));
             save_error_pos("syntax error", error_msg);
             error_recovery(stmt_follow_set, stmt_follow_set_size, "statement_after_declare");
+            free_ast(stmt_node);
+            return (ASTNode*)create_error_node();
         }
-        return;
+        return stmt_node;
     }
-    if (token == LBRACE) { // First of <CompoundStatement>
-        compound_statement();
-        return;
+
+    if (token == LBRACE) // First of <CompoundStatement>
+    { 
+        return compound_statement();
     }
-    if(token == IDENTIFIER) { // First of <Identifier> <AssignOrFuncCall>
+
+    if(token == IDENTIFIER) 
+    {
+        Symbol* id_sym = create_sym(yylval.sval, token);
         match(IDENTIFIER);
-        assign_or_func_call();
+        stmt_node = assign_or_func_call(id_sym); // id_sym is consumed by assign_or_func_call
         if(!match(SEMI)) {
             char error_msg[200];
             sprintf(error_msg, "Expected \';\' after assignment or function call, got %s", token_type_to_string(token));
             save_error_pos("syntax error", error_msg);
             error_recovery(stmt_follow_set, stmt_follow_set_size, "statement_after_assign_or_call");
+            free_ast(stmt_node);
+            return (ASTNode*)create_error_node();
         }
-        return;
+        return stmt_node;
     }
-    if(token == IF) { // First of <IfStatement>
-        if_statement();
-        return;
+    if(token == IF) 
+    {
+        return if_statement();
     }
-    if(token == WHILE) { // First of <WhileStatement>
-        while_statement();
-        return;
+    if(token == WHILE) 
+    {
+        return while_statement();
     }
-    if(token == RETURN) {
-        return_statement();
-        if(!match(SEMI)) {
+    if(token == RETURN) 
+    {
+        stmt_node = return_statement();
+        if(!match(SEMI)) 
+        {
             char error_msg[200];
             sprintf(error_msg, "Expected \';\' after return statement, got %s", token_type_to_string(token));
             save_error_pos("syntax error", error_msg);
             error_recovery(stmt_follow_set, stmt_follow_set_size, "statement_after_return");
+            free_ast(stmt_node);
+            return (ASTNode*)create_error_node();
         }
-        return;
+        return stmt_node;
     }
 
     // Special case: handle 'else' without 'if'
-    if(token == ELSE) {
+    if(token == ELSE) 
+    {
         char error_msg[200];
         sprintf(error_msg, "\'else\' without matching \'if\'");
         save_error_pos("syntax error", error_msg);
         get_next_token(); // Consume 'else'
 
-        if (token == LBRACE) { // If 'else' is followed by a block, skip the block
+        if (token == LBRACE) 
+        { 
             int brace_count = 1;
-            get_next_token(); // Consume LBRACE
-            while (token != EOF && brace_count > 0) { // Added EOF check
+            get_next_token(); 
+            while (token != EOF && brace_count > 0) 
+            { 
                 if (token == LBRACE) brace_count++;
                 else if (token == RBRACE) brace_count--;
                 get_next_token();
             }
         }
-        return;
+        return (ASTNode*)create_error_node(); // 'else' without 'if' is an error
     }
+
 
     // Epsilon production for <Statement> or start of next valid statement
-    // If current token is in FOLLOW(<Statement>) or can start a new statement.
-    if (is_in_follow_set(stmt_follow_set, stmt_follow_set_size)) {
-        // This means an empty statement is valid here, or we are at a token
-        // that can validly follow a statement (like RBRACE or start of next statement).
-        fprintf(log_file, "Epsilon production for <Statement> or at valid follow token: %s\n", token_type_to_string(token));
-        return;  
+    if (is_in_follow_set(stmt_follow_set, stmt_follow_set_size)) 
+    {
+        fprintf(log_file, "Epsilon production for <Statement> or at valid follow token: %s\\n", token_type_to_string(token));
+        return NULL;
     }
 
+    // If no statement rule matched and not epsilon/follow:
     char error_msg[200];
     sprintf(error_msg, "Unexpected token %s in statement. Cannot start a new statement.", token_type_to_string(token));
     save_error_pos("syntax error", error_msg);
-    // Attempt recovery by skipping to a token that can start a new statement or end the current block.
     error_recovery(stmt_follow_set, stmt_follow_set_size, "statement_unexpected_token");
-    // After error_recovery, the token should be one from the follow_set, or EOF.
-    // The loop in statement_list will then re-evaluate with the new token.
+    return (ASTNode*)create_error_node();
 }
 
 // <AssignmentStatement> ::= = <Expression>
-void assignment_statement() 
+ASTNode* assignment_statement(Symbol* id_sym) 
 {
     fprintf(log_file, "Parsing <AssignmentStatement>\n");
-    match(ASSIGN);
-    expression();
+    ASTNode* id_node = (ASTNode*)create_identifier_node(id_sym);
+
+    if (!match(ASSIGN)) 
+    {
+        free_ast(id_node); 
+        return (ASTNode*)create_error_node();
+    }
+
+    ASTNode* expr_node = expression();
+    return (ASTNode*)create_assignment_statement_node(id_node, expr_node);
 }
 
-// <AssignOrFuncCall> ::= = <AssignmentStatement> | <FunctionCallStatement> 
-void assign_or_func_call() 
+// <AssignOrFuncCall> ::= <AssignmentStatement> | <FunctionCallStatement> 
+ASTNode* assign_or_func_call(Symbol* id_sym) 
 {
     fprintf(log_file, "Parsing <AssignOrFuncCall> (current token: %s)\n", token_type_to_string(token));
     
-    // Check for assignment: = <Expression>
-    if (token == ASSIGN) {
-        assignment_statement();
-        return;
-    }
+    if (token == ASSIGN) return assignment_statement(id_sym);
 
-    // Check for function call: ( <ArgumentListOpt> )
-    if (token == LPAREN) {
-        function_call_statement();
-        return;
-    }
+    if (token == LPAREN) return function_call_statement(id_sym);
+
+    // Error: expected '=' or '(' after identifier in a statement context
+    int follow_set[] = {SEMI}; // Follow for AssignOrFuncCall (which is ';')
+    char error_msg[200];
+    sprintf(error_msg, "Expected \'=\' or \'(\' after identifier, got %s", token_type_to_string(token));
+    save_error_pos("syntax error", error_msg);
+    error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "assign_or_func_call_operator");
+    return (ASTNode*)create_error_node();
 }
 
-// <FunctionCallStatement> ::= <Identifier> ( <ArgumentListOpt> ) ;
-void function_call_statement() 
+// <FunctionCallStatement> ::= ( <ArgumentListOpt> ) ; (Identifier already matched, passed as id_sym)
+ASTNode* function_call_statement(Symbol* id_sym) 
 {
-    fprintf(log_file, "Parsing <FunctionCallStatement> (current token: %s)\n", token_type_to_string(token));
-    match(LPAREN);
-    argument_list_opt();
-    if(!match(RPAREN))
+    fprintf(log_file, "Parsing <FunctionCallStatement> (current token: %s)\n");
+    ASTNode* id_node = (ASTNode*)create_identifier_node(id_sym); // Consumes id_sym
+
+    if(!match(LPAREN)) // LPAREN already checked by assign_or_func_call
+    { 
+        free_ast(id_node);
+        return (ASTNode*)create_error_node();
+    }
+    ASTNode* args_node = argument_list_opt(); // Can be NULL or ErrorNode
+
+    if (!match(RPAREN)) 
     {
-        int follow_set[] = {MUL, DIV, PLUS, MINUS, RPAREN, SEMI, LT, LE, GT, GE, EQ, NE, COMMA}; // Follow set for <FunctionCallStatement>
+        int follow_set[] = {SEMI};
         char error_msg[200];
         sprintf(error_msg, "Expected \')\' after function call arguments, got %s",
                 token_type_to_string(token));
         save_error_pos("syntax error", error_msg);
-        error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "function_call_statement");
-        return;
+        error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "function_call_statement_rparen");
+        // If RPAREN missing, proceed if recovery finds SEMI, otherwise error
+        if (token != SEMI) { // A more robust check might be needed
+            free_ast(id_node); free_ast(args_node);
+            return (ASTNode*)create_error_node();
+        }
     }
+
+    return (ASTNode*)create_function_call_node(id_node, args_node);
 }
 
 // <ArgumentListOpt> ::= <ArgumentList> | epsilon
-void argument_list_opt() 
+ASTNode* argument_list_opt() 
 {
-    fprintf(log_file, "Parsing <ArgumentListOpt> (current token: %s)\n", token_type_to_string(token));
-
+    fprintf(log_file, "Parsing <ArgumentListOpt> (current token: %s)\n");
+    // FIRST of ArgumentList is FIRST of Expression (ID, NUMBER, LPAREN)
     if (token == IDENTIFIER || token == NUMBER || token == LPAREN) {
-        argument_list();
-        return;
+        return argument_list();
     }
+    // Epsilon case
+    return NULL; 
 }
 
 // <ArgumentList> ::= <Expression> { , <Expression> }
-void argument_list() 
+ASTNode* argument_list() 
 {
     fprintf(log_file, "Parsing <ArgumentList> (current token: %s)\n", token_type_to_string(token));
-    expression();
+    ASTNode* head_expr_node = NULL;
+    ASTNode* current_expr_node = NULL;
+
+    ASTNode* expr_node = expression();
+    head_expr_node = expr_node;
+    current_expr_node = expr_node;
+
     while (token == COMMA) 
     {
         match(COMMA);
-        expression();
+        expr_node = expression();
+        current_expr_node->next = expr_node;
+        current_expr_node = expr_node;
     }
+    return head_expr_node;
 }
 
 // <DeclareStatement> ::= <Type> <InitDeclarator> { , <InitDeclarator> }
-void declare_statement() 
+ASTNode* declare_statement() 
 {
-    fprintf(log_file, "Parsing <DeclareStatment> (current token: %s)\n", token_type_to_string(token));
-    type();
-    init_declarator();
+    fprintf(log_file, "Parsing <DeclareStatement> (current token: %s)\n", token_type_to_string(token));
+    ASTNode* type_node = type();
+
+    LocalVariableDeclarationNode* lvd_node = create_local_variable_declaration_node(type_node, NULL);
+    if (!lvd_node)
+    {
+        perror("Failed to create LocalVariableDeclarationNode");
+        free_ast(type_node);
+        return (ASTNode*)create_error_node();
+    }
+    
+    ASTNode* current_declarator_item = NULL;
+
+    ASTNode* decl_node = init_declarator();
+    lvd_node->start = decl_node;
+    current_declarator_item = decl_node;
 
     while(token == COMMA) 
     {
         match(COMMA);
-        init_declarator();
+        decl_node = init_declarator();
+        current_declarator_item->next = decl_node;
+        current_declarator_item = decl_node;
     }
+    return (ASTNode*)lvd_node;
 }
 
 // <InitDeclarator> ::= <Identifier> [ = <Expression> ]
-void init_declarator() 
+ASTNode* init_declarator() 
 {
     fprintf(log_file, "Parsing <InitDeclarator> (current token: %s)\n", token_type_to_string(token));
-    if(!match(IDENTIFIER))
+    Symbol* var_sym = NULL;
+    if (token == IDENTIFIER) 
     {
-        int follow_set[] = {COMMA, SEMI}; // Follow set for <InitDeclarator>
+        var_sym = insert_symbol(current_sym_table, yylval.sval, token);
+        match(IDENTIFIER);
+    } 
+    else 
+    {
+        int follow_set[] = {COMMA, SEMI, ASSIGN}; 
         char error_msg[200];
         sprintf(error_msg, "Expected identifier in initializer, got %s",
                 token_type_to_string(token));
         save_error_pos("syntax error", error_msg);
-        error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "init_declarator");
-        return;
+        error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "init_declarator_id");
+        return (ASTNode*)create_error_node();
     }
+    
+    ASTNode* id_node = (ASTNode*)create_identifier_node(var_sym); // Consumes var_sym
+    ASTNode* expr_node = NULL;
 
     if (token == ASSIGN) 
     {
         match(ASSIGN);
-        expression();
-        return;
+        expr_node = expression();
     } 
-    if(token == COMMA || token == SEMI) return;
-
-    int follow_set[] = {COMMA, SEMI}; // Follow set for <InitDeclarator>
-    char error_msg[200];
-    sprintf(error_msg, "Expected \'=\' or \',\' or \';\' after identifier, got %s",
-            token_type_to_string(token));
-    save_error_pos("syntax error", error_msg);
-    error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "init_declarator");
+    else if (token != COMMA && token != SEMI) 
+    { 
+        int follow_set[] = {COMMA, SEMI}; 
+        char error_msg[200];
+        sprintf(error_msg, "Expected \'=\' or \',\' or \';\' after identifier in declarator, got %s",
+                token_type_to_string(token));
+        save_error_pos("syntax error", error_msg);
+        error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "init_declarator_follow");
+        free_ast(id_node);
+        return (ASTNode*)create_error_node();
+    }
+    return (ASTNode*)create_variable_declarator_node(id_node, expr_node);
 }
 
-// <Type> ::= int | char
-void type() 
+// <Type> ::= int | char | void
+ASTNode* type() 
 {
     fprintf(log_file, "Parsing <Type> (current token: %s)\n",  token_type_to_string(token));
+    int type_val = -1;
     if (token == INT) 
     {
+        type_val = token;
         match(INT);
-        return;
     } 
-    if (token == CHAR) 
+    else if (token == CHAR) 
     {
+        type_val = token;
         match(CHAR);
-        return;
     } 
-    if (token == VOID) // Added VOID
+    else if (token == VOID)
     {
+        type_val = token;
         match(VOID);
-        return;
+    } 
+    else 
+    {
+        int follow_set[] = {IDENTIFIER}; // Common follow for type is an identifier
+        char error_msg[200];
+        sprintf(error_msg, "Expected type specifier (int, char, void), got %s", token_type_to_string(token));
+        save_error_pos("syntax error", error_msg);
+        error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "type_specifier");
+        return (ASTNode*)create_error_node();
     }
+    return (ASTNode*)create_type_node(type_val);
 }
 
 // <Expression> ::= <ArithmeticExpression> <RelationalPrime>
-void expression() 
+ASTNode* expression() 
 {
     fprintf(log_file, "Parsing <Expression> (current token: %s)\n", token_type_to_string(token));
-    arithmetic_expression();
-    relational_prime();
+    ASTNode* arith_expr_node = arithmetic_expression();
+    return relational_prime(arith_expr_node);
 }
 
 // <ArithmeticExpression> ::= <Term> <ArithmeticPrime>
-void arithmetic_expression() 
+ASTNode* arithmetic_expression() 
 {
     fprintf(log_file, "Parsing <ArithmeticExpression> (current token: %s)\n", token_type_to_string(token));
-    term();
-    arithmetic_prime();
+    ASTNode* term_node = term();
+    return arithmetic_prime(term_node);
 }
 
 // <ArithmeticPrime> ::= + <Term> <ArithmeticPrime>
 //                     | - <Term> <ArithmeticPrime>
 //                     | epsilon
-void arithmetic_prime() 
+ASTNode* arithmetic_prime(ASTNode* left_operand) 
 {
     fprintf(log_file, "Parsing <ArithmeticPrime> (current token: %s)\n", token_type_to_string(token));
-    if (token == PLUS) {
-        match(PLUS);
-        term();
-        arithmetic_prime();
-        return;
+
+    if (token == PLUS || token == MINUS) 
+    {
+        int op = token;
+        match(op);
+        ASTNode* term_node = term();
+        ASTNode* binary_expr_node = (ASTNode*)create_binary_expression_node(op, left_operand, term_node);
+        return arithmetic_prime(binary_expr_node); // Left-associativity through recursion
     } 
-    if (token == MINUS) {
-        match(MINUS);
-        term();
-        arithmetic_prime();
-        return;
+    
+    // Epsilon production: Check FOLLOW set as in original code for error reporting
+    if(token != RPAREN && token != SEMI && token != LE && token != GE && 
+        token != LT && token != GT && token != EQ && token != NE && token != COMMA) 
+    {
+        int follow_set[] = {RPAREN, SEMI, LE, GE, LT, GT, EQ, NE, COMMA};
+        if (!is_in_follow_set(follow_set, sizeof(follow_set)/sizeof(follow_set[0])))
+        {
+            char error_msg[200];
+            sprintf(error_msg, "Unexpected token %s in arithmetic expression prime",
+                    token_type_to_string(token));
+            save_error_pos("syntax error", error_msg);
+            error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "arithmetic_prime");
+            free_ast(left_operand);
+            return (ASTNode*)create_error_node();
+        }
     }
-
-    // else: Epsilon production. Do nothing.
-    if(token == RPAREN || token == SEMI || token == LE || token == GE || 
-        token == LT || token == GT || token == EQ || token == NE || token == COMMA) return;
-
-    int follow_set[] = {RPAREN, SEMI, LE, GE, LT, GT, EQ, NE, COMMA}; // Follow set for <ArithmeticPrime>
-    char error_msg[200];
-    sprintf(error_msg, "Unexpected token %s in expression prime",
-            token_type_to_string(token));
-    save_error_pos("syntax error", error_msg);
-    error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "arithmetic_prime");
+    return left_operand; // Epsilon case
 }
 
 // <RelationalPrime> ::= == <ArithmeticExpression> <RelationalPrime>
@@ -651,246 +907,285 @@ void arithmetic_prime()
 //                     | <= <ArithmeticExpression> <RelationalPrime>
 //                     | >= <ArithmeticExpression> <RelationalPrime>
 //                     | epsilon
-void relational_prime() 
+ASTNode* relational_prime(ASTNode* left_operand) 
 {
     fprintf(log_file, "Parsing <RelationalPrime> (current token: %s)\n", token_type_to_string(token));
-    if (token == EQ) {
-        match(EQ);
-        arithmetic_expression();
-        relational_prime();
-        return;
-    } 
-    if (token == NE) {
-        match(NE);
-        arithmetic_expression();
-        relational_prime();
-        return;
-    } 
-    if (token == LT) {
-        match(LT);
-        arithmetic_expression();
-        relational_prime();
-        return;
-    } 
-    if (token == GT) {
-        match(GT);
-        arithmetic_expression();
-        relational_prime();
-        return;
-    } 
-    if (token == LE) {
-        match(LE);
-        arithmetic_expression();
-        relational_prime();
-        return;
-    } 
-    if (token == GE) {
-        match(GE);
-        arithmetic_expression();
-        relational_prime();
-        return;
-    }
 
-    // else: Epsilon production. Do nothing.
-    if(token == RPAREN || token == SEMI || token == COMMA) {
-        return;
-    }
+    if (token == EQ || token == NE || token == LT || token == GT || token == LE || token == GE) 
+    {
+        int op = token;
+        match(op);
+        ASTNode* arith_expr_node = arithmetic_expression();
+        ASTNode* binary_expr_node = (ASTNode*)create_binary_expression_node(op, left_operand, arith_expr_node);
+        return relational_prime(binary_expr_node); // Left-associativity
+    } 
+    
+    // Epsilon production: Check FOLLOW set for error reporting
+    if(token != RPAREN && token != SEMI && token != COMMA) 
+    {
+        int follow_set[] = {RPAREN, SEMI, COMMA}; 
 
-    int follow_set[] = {RPAREN, SEMI, COMMA}; // Follow set for <RelationalPrime>
-    char error_msg[200];
-    sprintf(error_msg, "Unexpected token %s in relational prime",
-            token_type_to_string(token));
-    save_error_pos("syntax error", error_msg);
-    error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "relational_prime");
+        if(!is_in_follow_set(follow_set, sizeof(follow_set)/sizeof(follow_set[0])))
+        {
+            char error_msg[200];
+            sprintf(error_msg, "Unexpected token %s in relational expression prime",
+                    token_type_to_string(token));
+            save_error_pos("syntax error", error_msg);
+            error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "relational_prime");
+            free_ast(left_operand);
+            return (ASTNode*)create_error_node();
+        }
+    }
+    return left_operand; // Epsilon case
 }
 
 // <Term> ::= <Factor> <TermPrime>
-void term() 
+ASTNode* term() 
 {
     fprintf(log_file, "Parsing <Term>\n");
-    factor();
-    term_prime();
+    ASTNode* factor_node = factor();
+    return term_prime(factor_node);
 }
 
-// <TermPrime> ::= * <Factor> <TermPrime>  (Corrected from TermPrmie)
+// <TermPrime> ::= * <Factor> <TermPrime> 
 //               | / <Factor> <TermPrime>
 //               | epsilon
-void term_prime() 
+ASTNode* term_prime(ASTNode* left_operand) 
 {
     fprintf(log_file, "Parsing <TermPrime> (current token: %s)\n", token_type_to_string(token));
-    if (token == MUL) {
-        match(MUL);
-        factor();
-        term_prime();
-        return;
+    if (token == MUL || token == DIV) 
+    {
+        int op = token;
+        match(op);
+        ASTNode* factor_node = factor();
+        ASTNode* binary_expr_node = (ASTNode*)create_binary_expression_node(op, left_operand, factor_node);
+        return term_prime(binary_expr_node); // Left-associativity
+    } 
+    
+    // Epsilon production: Check FOLLOW set for error reporting
+    if(token != PLUS && token != MINUS && token != RPAREN && token != SEMI && token != LE && token != GE && 
+        token != LT && token != GT && token != EQ && token != NE && token != COMMA) 
+    {
+        int follow_set[] = {PLUS, MINUS, RPAREN, SEMI, LE, GE, LT, GT, EQ, NE, COMMA, RBRACE, EOF};
+        if(!is_in_follow_set(follow_set, sizeof(follow_set)/sizeof(follow_set[0])))
+        {
+            char error_msg[200];
+            sprintf(error_msg, "Unexpected token %s in term prime",
+                    token_type_to_string(token));
+            save_error_pos("syntax error", error_msg);
+            error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "term_prime");
+            free_ast(left_operand);
+            return (ASTNode*)create_error_node(); 
+        }
     }
-    if (token == DIV) {
-        match(DIV);
-        factor();
-        term_prime();
-        return;
-    }
-
-    // else: Epsilon production. Do nothing.
-    if(token == PLUS || token == MINUS || token == RPAREN || token == SEMI || token == LE || token == GE || 
-        token == LT || token == GT || token == EQ || token == NE || token == COMMA) return;
-
-    int follow_set[] = {PLUS, MINUS, RPAREN, SEMI, LE, GE, LT, GT, EQ, NE, COMMA}; // Follow set for <TermPrime>
-    char error_msg[200];
-    sprintf(error_msg, "Unexpected token %s in term prime",
-            token_type_to_string(token));
-    save_error_pos("syntax error", error_msg);
-    error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "term_prime");
+    return left_operand; // Epsilon case
 }
 
 // <Factor> ::= <Identifier> <EpsilonOrFuncCall> | <Number> | ( <Expression> )
-void factor() 
+ASTNode* factor() 
 {
-    fprintf(log_file, "Parsing <Factor> (current token: %s)\n", token_type_to_string(token));
+    fprintf(log_file, "Parsing <Factor> (current token: %s)\\n", token_type_to_string(token));
+    ASTNode* node = NULL;
     if (token == IDENTIFIER) 
     {
+        Symbol* sym = insert_symbol(current_sym_table, yylval.sval, token);
+        if (!sym) { perror("Failed to create symbol in factor"); return (ASTNode*)create_error_node(); }
         match(IDENTIFIER);
-        epsilon_or_func_call();
-        return;
+        node = (ASTNode*)epsilon_or_func_call_from_sym(sym);
     } 
-    if (token == NUMBER) 
+    else if (token == NUMBER) 
     {
+        int val = yylval.ival;
         match(NUMBER);
-        return;
+        node = (ASTNode*)create_number_literal_node(val);
     } 
-    if (token == LPAREN) {
+    else if (token == LPAREN) 
+    {
         match(LPAREN);
-        expression();
-        match(RPAREN);
-        return;
+        node = expression();
+        if (!match(RPAREN)) 
+        {
+            int follow_set[] = {MUL, DIV, PLUS, MINUS, RPAREN, SEMI, LE, GE, LT, GT, EQ, NE, COMMA};
+            char error_msg[200];
+            sprintf(error_msg, "Expected \')\' after expression in factor, got %s", token_type_to_string(token));
+            save_error_pos("syntax error", error_msg);
+            error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "factor_rparen");
+            if (token != RPAREN) 
+            {
+                 free_ast(node);
+                 return (ASTNode*)create_error_node();
+            }
+            match(RPAREN); // Consume if recovery found it
+        }
     } 
-
-    int follow_set[] = {PLUS, MINUS, MUL, DIV, RPAREN, SEMI, LE, GE, LT, GT, EQ, NE, COMMA}; // Follow set for <Factor>
-    char error_msg[200];
-    sprintf(error_msg, "Unexpected token %s in factor",
-            token_type_to_string(token));
-    save_error_pos("syntax error", error_msg);
-    error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "factor");
+    else 
+    {
+        int follow_set[] = {MUL, DIV, PLUS, MINUS, RPAREN, SEMI, LE, GE, LT, GT, EQ, NE, COMMA, RBRACE, EOF};
+        char error_msg[200];
+        sprintf(error_msg, "Unexpected token %s in factor. Expected identifier, number, or \'(\'",
+                token_type_to_string(token));
+        save_error_pos("syntax error", error_msg);
+        error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "factor_unexpected");
+        return (ASTNode*)create_error_node();
+    }
+    return node;
 }
 
-// <EpsilonOrFuncCall> ::= epsilon | <FunctionCallStatement>
-void epsilon_or_func_call() 
+// <EpsilonOrFuncCall> ::= epsilon | <FunctionCallStatement> (modified to take Symbol*)
+// Distinguishes between variable usage and function call based on LPAREN
+ASTNode* epsilon_or_func_call_from_sym(Symbol* func_sym) 
 {
-    fprintf(log_file, "Parsing <EpsilonOrFuncCall> (current token: %s)\n", token_type_to_string(token));
-    
-    if (token == LPAREN) {
-        function_call_statement();
-        return;
-    }
-    
-    // Epsilon production - do nothing if not a function call
-    // Follow set includes operators, semicolons, parentheses, etc.
-    if (token == MUL || token == DIV || token == PLUS || token == MINUS ||
-        token == LT || token == LE || token == GT || token == GE ||
-        token == EQ || token == NE || token == RPAREN || token == SEMI ||
-        token == COMMA) {
-        return;
-    }
+    fprintf(log_file, "Parsing <EpsilonOrFuncCallFromSym> (current token: %s)\n", token_type_to_string(token));
+    ASTNode* id_node = (ASTNode*)create_identifier_node(func_sym); // Consumes sym
 
-    int follow_set[] = {MUL, DIV, PLUS, MINUS, RPAREN, SEMI, LT, LE, GT, GE, EQ, NE, COMMA}; // Follow set for <EpsilonOrFuncCall>
-    char error_msg[200];
-    sprintf(error_msg, "Unexpected token %s after identifier in factor",
-            token_type_to_string(token));
-    save_error_pos("syntax error", error_msg);
-    error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "epsilon_or_func_call");
+    if (token == LPAREN) 
+    {
+        match(LPAREN);
+        ASTNode* args_node = argument_list_opt(); // Can be NULL or ErrorNode
+        if (!match(RPAREN)) 
+        {
+            int follow_set[] = {MUL, DIV, PLUS, MINUS, RPAREN, SEMI, LE, GE, LT, GT, EQ, NE, COMMA, RBRACE, EOF};
+            char error_msg[200];
+            sprintf(error_msg, "Expected \')\' after arguments in factor function call, got %s", token_type_to_string(token));
+            save_error_pos("syntax error", error_msg);
+            error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "epsilon_or_func_call_rparen");
+            if (token != RPAREN) 
+            {
+                free_ast(id_node); free_ast(args_node);
+                return (ASTNode*)create_error_node();
+            }
+            match(RPAREN);
+        }
+        return (ASTNode*)create_function_call_node(id_node, args_node);
+    }
+    
+    // Epsilon production (it's just an identifier)
+    if (token != MUL && token != DIV && token != PLUS && token != MINUS &&
+        token != LT && token != LE && token != GT && token != GE &&
+        token != EQ && token != NE && token != RPAREN && token != SEMI &&
+        token != COMMA) 
+    {
+        int follow_set[] = {MUL, DIV, PLUS, MINUS, RPAREN, SEMI, LT, LE, GT, GE, EQ, NE, COMMA, RBRACE, EOF};
+        char error_msg[200];
+        sprintf(error_msg, "Unexpected token %s after identifier in factor/expression",
+                token_type_to_string(token));
+        save_error_pos("syntax error", error_msg);
+        error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "epsilon_or_func_call_follow");
+        free_ast(id_node);
+        return (ASTNode*)create_error_node();
+    }
+    return id_node;
 }
 
 // <IfStatement> ::= if ( <Expression> ) <CompoundStatement> [ else <CompoundStatement> ]
-void if_statement() 
+ASTNode* if_statement() 
 {
     fprintf(log_file, "Parsing <IfStatement> (current token: %s)\n", token_type_to_string(token));
     match(IF);
-    if(!match(LPAREN))
+
+    if(!match(LPAREN)) 
     {
-        int follow_set[] = {IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE}; // Follow set for <IfStatement>
+        int follow_set[] = {IDENTIFIER, NUMBER, LPAREN, RBRACE, LBRACE}; // First of Expr or LBRACE for body
         char error_msg[200];
-        sprintf(error_msg, "Expected \'(\' after \'if\', got %s",
-                token_type_to_string(token));
+        sprintf(error_msg, "Expected \'(\' after \'if\', got %s", token_type_to_string(token));
         save_error_pos("syntax error", error_msg);
         error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "if_statement_missing_lparen");
-        return;
+        if (token != IDENTIFIER && token != NUMBER && token != LPAREN && token != LBRACE) return (ASTNode*)create_error_node();
+        if (token == LPAREN) match(LPAREN); else return (ASTNode*)create_error_node();
     }
-    expression();
-    if(!match(RPAREN))
+    
+    ASTNode* cond_node = expression();
+
+    if(!match(RPAREN)) 
     {
-        int follow_set[] = {IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE}; // Follow set for <IfStatement>
+        int follow_set[] = {LBRACE}; // Expect body next
         char error_msg[200];
-        sprintf(error_msg, "Expected \'(\' after \'if\', got %s",
-                token_type_to_string(token));
+        sprintf(error_msg, "Expected \')\' after \'if\' condition, got %s", token_type_to_string(token)); // Corrected message
         save_error_pos("syntax error", error_msg);
-        error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "if_statement_missing_rparen");
-        return;
+        error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "if_statement_missing_rparen_cond");
+        if (token != LBRACE) { free_ast(cond_node); return (ASTNode*)create_error_node(); }
+         // If recovery finds LBRACE, we assume RPAREN was implicitly there or skipped.
     }
-    compound_statement();
-    if (token == ELSE) {
+    ASTNode* then_body_node = compound_statement();
+
+    ASTNode* else_body_node = NULL;
+    if (token == ELSE) 
+    {
         match(ELSE);
-        compound_statement();
+        else_body_node = compound_statement();
     }
+    return (ASTNode*)create_if_statement_node(cond_node, then_body_node, else_body_node);
 }
 
 // <WhileStatement> ::= while ( <Expression> ) <CompoundStatement>
-void while_statement()
+ASTNode* while_statement()
 {
     fprintf(log_file, "Parsing <WhileStatement> (current token: %s)\n", token_type_to_string(token));
-    match(WHILE);
-    if(!match(LPAREN))
+
+    if(!match(LPAREN)) 
     {
-        int follow_set[] = {IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE}; // Follow set for <WhileStatement>
+        int follow_set[] = {IDENTIFIER, NUMBER, LPAREN, RBRACE, LBRACE};
         char error_msg[200];
-        sprintf(error_msg, "Expected \'(\' after \'while\', got %s",
-                token_type_to_string(token));
+        sprintf(error_msg, "Expected \'(\' after \'while\', got %s", token_type_to_string(token));
         save_error_pos("syntax error", error_msg);
         error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "while_statement_missing_lparen");
-        return;
+        if (token != IDENTIFIER && token != NUMBER && token != LPAREN && token != LBRACE) return (ASTNode*)create_error_node();
+        if (token == LPAREN) match(LPAREN); else return (ASTNode*)create_error_node();
     }
-    expression();
-    if(!match(RPAREN))
+
+    ASTNode* cond_node = expression();
+
+    if(!match(RPAREN)) 
     {
-        int follow_set[] = {IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE}; // Follow set for <WhileStatement>
+        int follow_set[] = {LBRACE};
         char error_msg[200];
-        sprintf(error_msg, "Expected \')\' after expression in \'while\', got %s",
-                token_type_to_string(token));
+        sprintf(error_msg, "Expected \')\' after expression in \'while\', got %s", token_type_to_string(token));
         save_error_pos("syntax error", error_msg);
         error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "while_statement_missing_rparen");
-        return;
+        if (token != LBRACE) { free_ast(cond_node); return (ASTNode*)create_error_node(); }
     }
-    compound_statement();
+
+    ASTNode* body_node = compound_statement();
+
+    return (ASTNode*)create_while_statement_node(cond_node, body_node);
 }
 
-void return_statement() 
+ASTNode* return_statement() 
 {
     fprintf(log_file, "Parsing <ReturnStatement> (current token: %s)\n", token_type_to_string(token));
     match(RETURN);
     
-    // Optional expression
-    if (token != SEMI && token != LBRACE && token != EOF) { // TODO : TBD
-        expression();
+    ASTNode* expr_node = NULL;
+
+    // Optional expression: if next token is not SEMI, try to parse an expression
+    if (token != SEMI && token != RBRACE && token != EOF) 
+    {
+        expr_node = expression();
     }
+
+    return (ASTNode*)create_return_statement_node(expr_node);
 }
 
 // --- Main Driver ---
 void parse() 
 {
+    current_sym_table = create_symbol_table(); // Initialize symbol table
 
     get_next_token();
-    program();
+    ast_root = program();
 
-    if (token == EOF) 
+    if (token == EOF && error_count == 0) // Also check error_count
     {
-        printf("Parsing reached EOF as expected.\n");
-        return;
+        fprintf(log_file, "Parsing reached EOF as expected.\n"); // Changed to log_file
+        // printf("Parsing reached EOF as expected.\\n");
     } 
-    else 
+    else if (token != EOF)
     {
         char error_msg[200];
         sprintf(error_msg, "Unexpected token %s at end of input instead of EOF",
                 token_type_to_string(token));
         save_error_pos("syntax error", error_msg);
+        fprintf(log_file, "Error: %s\n", error_msg);
     }
 }
 
@@ -923,15 +1218,34 @@ int main(int argc, char **argv)
 
     parse();
 
+
     if(error_count > 0) 
     {
         printf("Parsing completed with %d errors.\n", error_count);
         show_and_free_errors();
     } 
-    else 
+    else if (ast_root && ast_root->type != NODE_ERROR) // Check if AST root is valid
     {
         printf("Parsing completed successfully.\n");
+        // TODO : Here you might want to print/traverse the AST for verification
+        // e.g., print_ast(ast_root); 
+    } 
+    else 
+    {
+        printf("Parsing completed, but AST generation might have failed or resulted in an error node at root.\n");
     }
 
-    return 0;
+    if (ast_root) 
+    {
+        fprintf(log_file, "AST construction complete. Root type: %d. AST freeing is commented out for now.\n", ast_root->type);
+        free_ast(ast_root);
+    }
+
+    // TODO : Now I free here, but actually it will be free after semantic analysis ( traverse through AST )
+    show_symbol_table(current_sym_table);
+    free_symbol_table(current_sym_table);
+
+
+    fclose(log_file);
+    return error_count > 0 ? 1 : 0; // Return non-zero on error
 }

@@ -62,6 +62,7 @@
 	- int, char, void ( from `<DeclareStatement>` )
 	- if ( from `<IfStatement>` )
 	- while ( from `<WhileStatement>` )
+	- return
 	- } 
 	- else
 
@@ -92,6 +93,7 @@
 	- int, char, void
 	- if
 	- while
+	- return
 	- }
 
 `<AssignOrFuncCall>`
