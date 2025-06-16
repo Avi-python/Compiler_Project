@@ -12,11 +12,13 @@ ProgramNode* create_program_node(ASTNode* start) {
     return node;
 }
 
-FunctionDefinitionNode* create_function_definition_node(ASTNode* type, ASTNode* name_identifier, ASTNode* params, ASTNode* body) {
+FunctionDefinitionNode* create_function_definition_node(ASTNode* type, ASTNode* name_identifier, ASTNode* params, ASTNode* body, int lineno, int colno) {
     FunctionDefinitionNode* node = (FunctionDefinitionNode*)malloc(sizeof(FunctionDefinitionNode));
     if (node == NULL) return NULL;
     
     node->base.type = NODE_FUNCTION_DEFINITION;
+    node->base.lineno = lineno;
+    node->base.colno = colno;
     node->base.next = NULL;
     node->base.root = NULL;
     node->type = type;
@@ -26,11 +28,13 @@ FunctionDefinitionNode* create_function_definition_node(ASTNode* type, ASTNode* 
     return node;
 }
 
-GlobalVariableDeclarationNode* create_global_variable_declaration_node(ASTNode* type, ASTNode* start) {
+GlobalVariableDeclarationNode* create_global_variable_declaration_node(ASTNode* type, ASTNode* start, int lineno, int colno) {
     GlobalVariableDeclarationNode* node = (GlobalVariableDeclarationNode*)malloc(sizeof(GlobalVariableDeclarationNode));
     if (node == NULL) return NULL;
     
     node->base.type = NODE_GLOBAL_VARIABLE_DECLARATION;
+    node->base.lineno = lineno;
+    node->base.colno = colno;
     node->base.next = NULL;
     node->base.root = NULL;
     node->type = type;
@@ -38,11 +42,13 @@ GlobalVariableDeclarationNode* create_global_variable_declaration_node(ASTNode* 
     return node;
 }
 
-LocalVariableDeclarationNode* create_local_variable_declaration_node(ASTNode* type, ASTNode* start) {
+LocalVariableDeclarationNode* create_local_variable_declaration_node(ASTNode* type, ASTNode* start, int lineno, int colno) {
     LocalVariableDeclarationNode* node = (LocalVariableDeclarationNode*)malloc(sizeof(LocalVariableDeclarationNode));
     if (node == NULL) return NULL;
     
     node->base.type = NODE_LOCAL_VARIABLE_DECLARATION;
+    node->base.lineno = lineno;
+    node->base.colno = colno;
     node->base.next = NULL;
     node->base.root = NULL;
     node->type = type;
@@ -50,11 +56,13 @@ LocalVariableDeclarationNode* create_local_variable_declaration_node(ASTNode* ty
     return node;
 }
 
-VariableDeclaratorNode* create_variable_declarator_node(ASTNode* identifier, ASTNode* expression) {
+VariableDeclaratorNode* create_variable_declarator_node(ASTNode* identifier, ASTNode* expression, int lineno, int colno) {
     VariableDeclaratorNode* node = (VariableDeclaratorNode*)malloc(sizeof(VariableDeclaratorNode));
     if (node == NULL) return NULL;
     
     node->base.type = NODE_VARIABLE_DECLARATOR;
+    node->base.lineno = lineno;
+    node->base.colno = colno;
     node->base.next = NULL;
     node->base.root = NULL;
     node->identifier = identifier;
@@ -62,11 +70,13 @@ VariableDeclaratorNode* create_variable_declarator_node(ASTNode* identifier, AST
     return node;
 }
 
-ParameterNode* create_parameter_node(ASTNode* type, ASTNode* name_identifier) {
+ParameterNode* create_parameter_node(ASTNode* type, ASTNode* name_identifier, int lineno, int colno) {
     ParameterNode* node = (ParameterNode*)malloc(sizeof(ParameterNode));
     if (node == NULL) return NULL;
     
     node->base.type = NODE_PARAMETER;
+    node->base.lineno = lineno;
+    node->base.colno = colno;
     node->base.next = NULL;
     node->base.root = NULL;
     node->type = type;
@@ -74,22 +84,26 @@ ParameterNode* create_parameter_node(ASTNode* type, ASTNode* name_identifier) {
     return node;
 }
 
-CompoundStatementNode* create_compound_statement_node(ASTNode* start) {
+CompoundStatementNode* create_compound_statement_node(ASTNode* start, int lineno, int colno) {
     CompoundStatementNode* node = (CompoundStatementNode*)malloc(sizeof(CompoundStatementNode));
     if (node == NULL) return NULL;
     
     node->base.type = NODE_COMPOUND_STATEMENT;
+    node->base.lineno = lineno;
+    node->base.colno = colno;
     node->base.next = NULL;
     node->base.root = NULL;
     node->start = start;
     return node;
 }
 
-IfStatementNode* create_if_statement_node(ASTNode* condition, ASTNode* body, ASTNode* else_body) {
+IfStatementNode* create_if_statement_node(ASTNode* condition, ASTNode* body, ASTNode* else_body, int lineno, int colno) {
     IfStatementNode* node = (IfStatementNode*)malloc(sizeof(IfStatementNode));
     if (node == NULL) return NULL;
     
     node->base.type = NODE_IF_STATEMENT;
+    node->base.lineno = lineno;
+    node->base.colno = colno;
     node->base.next = NULL;
     node->base.root = NULL;
     node->condition = condition;
@@ -98,11 +112,13 @@ IfStatementNode* create_if_statement_node(ASTNode* condition, ASTNode* body, AST
     return node;
 }
 
-WhileStatementNode* create_while_statement_node(ASTNode* condition, ASTNode* body) {
+WhileStatementNode* create_while_statement_node(ASTNode* condition, ASTNode* body, int lineno, int colno) {
     WhileStatementNode* node = (WhileStatementNode*)malloc(sizeof(WhileStatementNode));
     if (node == NULL) return NULL;
     
     node->base.type = NODE_WHILE_STATEMENT;
+    node->base.lineno = lineno;
+    node->base.colno = colno;
     node->base.next = NULL;
     node->base.root = NULL;
     node->condition = condition;
@@ -110,22 +126,26 @@ WhileStatementNode* create_while_statement_node(ASTNode* condition, ASTNode* bod
     return node;
 }
 
-ReturnStatementNode* create_return_statement_node(ASTNode* expression) {
+ReturnStatementNode* create_return_statement_node(ASTNode* expression, int lineno, int colno) {
     ReturnStatementNode* node = (ReturnStatementNode*)malloc(sizeof(ReturnStatementNode));
     if (node == NULL) return NULL;
     
     node->base.type = NODE_RETURN_STATEMENT;
+    node->base.lineno = lineno;
+    node->base.colno = colno;
     node->base.next = NULL;
     node->base.root = NULL;
     node->expression = expression;
     return node;
 }
 
-AssignmentStatementNode* create_assignment_statement_node(ASTNode* identifier, ASTNode* expression) {
+AssignmentStatementNode* create_assignment_statement_node(ASTNode* identifier, ASTNode* expression, int lineno, int colno) {
     AssignmentStatementNode* node = (AssignmentStatementNode*)malloc(sizeof(AssignmentStatementNode));
     if (node == NULL) return NULL;
     
     node->base.type = NODE_ASSIGNMENT_STATEMENT;
+    node->base.lineno = lineno;
+    node->base.colno = colno;
     node->base.next = NULL;
     node->base.root = NULL;
     node->identifier = identifier;
@@ -133,11 +153,13 @@ AssignmentStatementNode* create_assignment_statement_node(ASTNode* identifier, A
     return node;
 }
 
-BinaryExpressionNode* create_binary_expression_node(int op, ASTNode* left, ASTNode* right) {
+BinaryExpressionNode* create_binary_expression_node(int op, ASTNode* left, ASTNode* right, int lineno, int colno) {
     BinaryExpressionNode* node = (BinaryExpressionNode*)malloc(sizeof(BinaryExpressionNode));
     if (node == NULL) return NULL;
     
     node->base.type = NODE_BINARY_EXPRESSION;
+    node->base.lineno = lineno;
+    node->base.colno = colno;
     node->base.next = NULL;
     node->base.root = NULL;
     node->op = op;
@@ -146,11 +168,13 @@ BinaryExpressionNode* create_binary_expression_node(int op, ASTNode* left, ASTNo
     return node;
 }
 
-FunctionCallNode* create_function_call_node(ASTNode* identifier, ASTNode* params) {
+FunctionCallNode* create_function_call_node(ASTNode* identifier, ASTNode* params, int lineno, int colno) {
     FunctionCallNode* node = (FunctionCallNode*)malloc(sizeof(FunctionCallNode));
     if (node == NULL) return NULL;
     
     node->base.type = NODE_FUNCTION_CALL;
+    node->base.lineno = lineno;
+    node->base.colno = colno;
     node->base.next = NULL;
     node->base.root = NULL;
     node->identifier = identifier;
@@ -158,44 +182,52 @@ FunctionCallNode* create_function_call_node(ASTNode* identifier, ASTNode* params
     return node;
 }
 
-IdentifierNode* create_identifier_node(Symbol* symbol) {
+IdentifierNode* create_identifier_node(Symbol* symbol, int lineno, int colno) {
     IdentifierNode* node = (IdentifierNode*)malloc(sizeof(IdentifierNode));
     if (node == NULL) return NULL;
     
     node->base.type = NODE_IDENTIFIER;
+    node->base.lineno = lineno;
+    node->base.colno = colno;
     node->base.next = NULL;
     node->base.root = NULL;
     node->symbol = symbol;
     return node;
 }
 
-NumberNode* create_number_literal_node(int value) {
+NumberNode* create_number_literal_node(int value, int lineno, int colno) {
     NumberNode* node = (NumberNode*)malloc(sizeof(NumberNode));
     if (node == NULL) return NULL;
     
     node->base.type = NODE_NUMBER_LITERAL;
+    node->base.lineno = lineno;
+    node->base.colno = colno;
     node->base.next = NULL;
     node->base.root = NULL;
     node->value = value;
     return node;
 }
 
-TypeNode* create_type_node(int type_specifier) {
+TypeNode* create_type_node(int type_specifier, int lineno, int colno) {
     TypeNode* node = (TypeNode*)malloc(sizeof(TypeNode));
     if (node == NULL) return NULL;
     
     node->base.type = NODE_TYPE;
+    node->base.lineno = lineno;
+    node->base.colno = colno;
     node->base.next = NULL;
     node->base.root = NULL;
     node->type = type_specifier;
     return node;
 }
 
-ErrorNode* create_error_node() {
+ErrorNode* create_error_node(int lineno, int colno) {
     ErrorNode* node = (ErrorNode*)malloc(sizeof(ErrorNode));
     if (node == NULL) return NULL;
     
     node->base.type = NODE_ERROR;
+    node->base.lineno = lineno;
+    node->base.colno = colno;
     node->base.next = NULL;
     node->base.root = NULL;
     return node;

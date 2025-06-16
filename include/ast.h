@@ -26,6 +26,8 @@ typedef enum {
 
 typedef struct ASTNode {
     ASTNodeType type;
+    int lineno;
+    int colno;
     struct ASTNode* next;
     struct ASTNode* root; 
 } ASTNode;
@@ -34,7 +36,7 @@ typedef struct {
     ASTNode base;
     Symbol* symbol;
 } IdentifierNode;
-IdentifierNode* create_identifier_node(Symbol* symbol);
+IdentifierNode* create_identifier_node(Symbol* symbol, int lineno, int colno);
 
 typedef struct {
     ASTNode base;
@@ -49,47 +51,47 @@ typedef struct {
     ASTNode* params; // list of ParameterNode
     ASTNode* body;
 } FunctionDefinitionNode;
-FunctionDefinitionNode* create_function_definition_node(ASTNode* type, ASTNode* name_identifier, ASTNode* params, ASTNode* body);
+FunctionDefinitionNode* create_function_definition_node(ASTNode* type, ASTNode* name_identifier, ASTNode* params, ASTNode* body, int lineno, int colno);
 
 typedef struct {
     ASTNode base;
     ASTNode* type;
     ASTNode* start; // list of VariableDeclaratorNode
 } GlobalVariableDeclarationNode;
-GlobalVariableDeclarationNode* create_global_variable_declaration_node(ASTNode* type, ASTNode* start);
+GlobalVariableDeclarationNode* create_global_variable_declaration_node(ASTNode* type, ASTNode* start, int lineno, int colno);
 
 typedef struct {
     ASTNode base;
     ASTNode* identifier;
     ASTNode* expression;
 } VariableDeclaratorNode;
-VariableDeclaratorNode* create_variable_declarator_node(ASTNode* identifier, ASTNode* expression);
+VariableDeclaratorNode* create_variable_declarator_node(ASTNode* identifier, ASTNode* expression, int lineno, int colno);
 
 typedef struct {
     ASTNode base;
     ASTNode* expression;
 } ReturnStatementNode;
-ReturnStatementNode* create_return_statement_node(ASTNode* expression);
+ReturnStatementNode* create_return_statement_node(ASTNode* expression, int lineno, int colno);
 
 typedef struct {
     ASTNode base;
     ASTNode* type;
     ASTNode* start; // list of VariableDeclaratorNode
 } LocalVariableDeclarationNode;
-LocalVariableDeclarationNode* create_local_variable_declaration_node(ASTNode* type, ASTNode* start);
+LocalVariableDeclarationNode* create_local_variable_declaration_node(ASTNode* type, ASTNode* start, int lineno, int colno);
 
 typedef struct {
     ASTNode base;
     ASTNode* type;
     ASTNode* name_identifier;
 } ParameterNode; 
-ParameterNode* create_parameter_node(ASTNode* type, ASTNode* name_identifier);
+ParameterNode* create_parameter_node(ASTNode* type, ASTNode* name_identifier, int lineno, int colno);
 
 typedef struct {
     ASTNode base;
     ASTNode* start; // list of StatementNode
 } CompoundStatementNode;
-CompoundStatementNode* create_compound_statement_node(ASTNode* start);
+CompoundStatementNode* create_compound_statement_node(ASTNode* start, int lineno, int colno);
 
 typedef struct {
     ASTNode base;
@@ -97,28 +99,28 @@ typedef struct {
     ASTNode* body;
     ASTNode* else_body;
 } IfStatementNode;
-IfStatementNode* create_if_statement_node(ASTNode* condition, ASTNode* body, ASTNode* else_body);
+IfStatementNode* create_if_statement_node(ASTNode* condition, ASTNode* body, ASTNode* else_body, int lineno, int colno);
 
 typedef struct {
     ASTNode base;
     ASTNode* condition;
     ASTNode* body;
 } WhileStatementNode;
-WhileStatementNode* create_while_statement_node(ASTNode* condition, ASTNode* body);
+WhileStatementNode* create_while_statement_node(ASTNode* condition, ASTNode* body, int lineno, int colno);
 
 typedef struct {
     ASTNode base;
     ASTNode* identifier;
     ASTNode* expression;
 } AssignmentStatementNode;
-AssignmentStatementNode* create_assignment_statement_node(ASTNode* identifier, ASTNode* expression);
+AssignmentStatementNode* create_assignment_statement_node(ASTNode* identifier, ASTNode* expression, int lineno, int colno);
 
 typedef struct {
     ASTNode base;
     ASTNode* identifier;
     ASTNode* params;
 } FunctionCallNode;
-FunctionCallNode* create_function_call_node(ASTNode* identifier, ASTNode* params);
+FunctionCallNode* create_function_call_node(ASTNode* identifier, ASTNode* params, int lineno, int colno);
 
 typedef struct {
     ASTNode base;
@@ -126,24 +128,24 @@ typedef struct {
     ASTNode* left; 
     ASTNode* right;
 } BinaryExpressionNode;
-BinaryExpressionNode* create_binary_expression_node(int op, ASTNode* left, ASTNode* right);
+BinaryExpressionNode* create_binary_expression_node(int op, ASTNode* left, ASTNode* right, int lineno, int colno);
 
 typedef struct {
     ASTNode base;
     int value;
 } NumberNode;
-NumberNode* create_number_literal_node(int value);
+NumberNode* create_number_literal_node(int value, int lineno, int colno);
 
 typedef struct {
     ASTNode base;
     int type;
 } TypeNode;
-TypeNode* create_type_node(int type_specifier);
+TypeNode* create_type_node(int type_specifier, int lineno, int colno);
 
 typedef struct {
     ASTNode base;
 } ErrorNode;
-ErrorNode* create_error_node();
+ErrorNode* create_error_node(int lineno, int colno);
 
 // Function to free an AST tree
 void free_ast(ASTNode* node);

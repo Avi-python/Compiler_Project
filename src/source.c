@@ -1,13 +1,8 @@
 int a, b, c = 13 + + 7;
 
-int helper(char x, char y)
-{
-    return x - y;
-}
-
 int helper(int x, int y)
 {
-    return x + y;
+    int z = x + y;
 }
 
 int main()
@@ -18,7 +13,7 @@ int main()
     {
         b = a + c;
     } 
-    else 
+    else
     {
         b = a - c;
     }

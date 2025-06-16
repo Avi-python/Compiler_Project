@@ -1,5 +1,6 @@
 %{
 #include <string.h> // Required for strdup if yylval is char* and you copy yytext
+#include <stdlib.h>
 #include "tokens.h"
 #include "error.h"
 #include "reswords.h"
@@ -7,7 +8,8 @@
 extern void yyerror(const char *s); 
 extern YYSTYPE yylval;
 
-void save_error_pos(char* type, char* token);
+void save_error_details(const char* type, const char* msg, int line, int col, const char* filename_to_use);
+void save_error_lexer_pos(const char* type, const char* msg);
 void free_errors_arr();
 void show_and_free_errors();
 
@@ -40,7 +42,7 @@ character   \'([^'])\'
 <COMMENT>\n        { lineno++; column = 1; /* Newline inside comment */ }
 <COMMENT>.         { column++; /* Character inside comment, ignored */ }
 <COMMENT><<EOF>>   { 
-                       save_error_pos("lexical error", "unterminated /* comment"); 
+                       save_error_lexer_pos("lexical error", "unterminated /* comment"); 
                        yyterminate(); /* Terminate scanning due to unterminated comment at EOF */
                    }
 
@@ -76,16 +78,32 @@ character   \'([^'])\'
 
 {number}        { yylval.ival = atoi(yytext); column += yyleng; return NUMBER; } // Assuming yylval.ival is int
 {character}     { yylval.sval = strdup(yytext); column += yyleng; return CHAR; } // Assuming yylval.sval is char* for the literal string
-.               { save_error_pos("unexpected character", yytext); column += yyleng; }
+.               { save_error_lexer_pos("unexpected character", yytext); column += yyleng; }
 
 %%
 
 int yywrap(void) { return 1; }
 
+int compare_errors(const void *a, const void *b) 
+{
+    Error *error_a = *(Error**)a;
+    Error *error_b = *(Error**)b;
+    if (error_a->row < error_b->row) return -1;
+    if (error_a->row > error_b->row) return 1;
+    if (error_a->col < error_b->col) return -1;
+    if (error_a->col > error_b->col) return 1;
+    return 0;
+}
+
 void show_and_free_errors() 
 {
     // read file
     FILE *file = fopen(yyfilename, "r");
+
+    if(error_count > 0) 
+    {
+        qsort(errors_arr, error_count, sizeof(Error*), compare_errors);
+    }
 
     int current_line = 0;
     char line[256];
@@ -118,22 +136,29 @@ void show_and_free_errors()
     free_errors_arr();
 }
 
-void save_error_pos(char* type, char* msg) 
+void save_error_details(const char* type, const char* msg, int line, int col, const char* filename_to_use) 
 {
     if (error_count < 1024) 
     {
         errors_arr[error_count] = (Error*)malloc(sizeof(Error));
-        errors_arr[error_count]->row = lineno;
-        errors_arr[error_count]->col = column;
+        errors_arr[error_count]->row = line;
+        errors_arr[error_count]->col = col;
 
-        strncpy(errors_arr[error_count]->filename, yyfilename, sizeof(errors_arr[error_count]->filename) - 1);
-        errors_arr[error_count]->filename[sizeof(errors_arr[error_count]->filename) - 1] = '\0'; // Ensure null-termination
+        if (filename_to_use) 
+        {
+            strncpy(errors_arr[error_count]->filename, filename_to_use, sizeof(errors_arr[error_count]->filename) - 1);
+            errors_arr[error_count]->filename[sizeof(errors_arr[error_count]->filename) - 1] = '\0';
+        } else 
+        {
+            strncpy(errors_arr[error_count]->filename, "unknown_file", sizeof(errors_arr[error_count]->filename) - 1);
+            errors_arr[error_count]->filename[sizeof(errors_arr[error_count]->filename) - 1] = '\0';
+        }
 
         strncpy(errors_arr[error_count]->type, type, sizeof(errors_arr[error_count]->type) - 1);
-        errors_arr[error_count]->type[sizeof(errors_arr[error_count]->type) - 1] = '\0'; // Ensure null-termination
+        errors_arr[error_count]->type[sizeof(errors_arr[error_count]->type) - 1] = '\0';
 
         strncpy(errors_arr[error_count]->msg, msg, sizeof(errors_arr[error_count]->msg) - 1);
-        errors_arr[error_count]->msg[sizeof(errors_arr[error_count]->msg) - 1] = '\0'; // Ensure null-termination
+        errors_arr[error_count]->msg[sizeof(errors_arr[error_count]->msg) - 1] = '\0';
 
         error_count++;
     }
@@ -141,6 +166,11 @@ void save_error_pos(char* type, char* msg)
     {
         fprintf(stderr, "Error: Too many errors, cannot save more.\n");
     }
+}
+
+void save_error_lexer_pos(const char* type, const char* msg)
+{
+    save_error_details(type, msg, lineno, column, yyfilename);
 }
 
 void free_errors_arr()
