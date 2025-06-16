@@ -19,17 +19,37 @@ LEX_L_FILE = scanner.l
 PARSER_FILE = parser.c
 AST_FILE = ast.c
 SYMBOL_FILE = symbol.c
+DRIVER_FILE = driver.c
+HASHTABLE_FILE = hashtable.c
+SYMBOL_TABLE_FILE = symbol_table.c
 RESWORDS_GPERF_FILE = reswords.gperf
 
 # Generated C file from Flex
 LEX_C_FILE = lex.yy.c
 
 # Header files - now in include directory
-HEADERS = $(INCLUDE_DIR)/tokens.h $(INCLUDE_DIR)/ast.h $(INCLUDE_DIR)/symbol.h $(INCLUDE_DIR)/symbol_table.h $(INCLUDE_DIR)/hashtable.h $(INCLUDE_DIR)/error.h
+HEADERS = \
+	$(INCLUDE_DIR)/tokens.h \
+	$(INCLUDE_DIR)/ast.h \
+	$(INCLUDE_DIR)/symbol.h \
+	$(INCLUDE_DIR)/symbol_table.h \
+	$(INCLUDE_DIR)/hashtable.h \
+	$(INCLUDE_DIR)/error.h \
+	$(INCLUDE_DIR)/parser.h \
+	$(INCLUDE_DIR)/hashtable.h \
+	$(INCLUDE_DIR)/symbol_table.h
+
 RESWORDS_H_FILE = reswords.h
 
 # Object files
-OBJS = $(PARSER_FILE:.c=.o) $(AST_FILE:.c=.o) $(SYMBOL_FILE:.c=.o) lex.yy.o
+OBJS = \
+	$(SYMBOL_TABLE_FILE:.c=.o) \
+	$(HASHTABLE_FILE:.c=.o) \
+	$(DRIVER_FILE:.c=.o) \
+	$(PARSER_FILE:.c=.o) \
+	$(AST_FILE:.c=.o) \
+	$(SYMBOL_FILE:.c=.o) \
+	lex.yy.o
 
 # Default target: build the executable
 all: $(TARGET)
@@ -38,9 +58,21 @@ all: $(TARGET)
 $(TARGET): $(OBJS) $(HEADERS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LDFLAGS)
 
+# Rule to compile driver.c
+$(DRIVER_FILE:.c=.o): $(DRIVER_FILE) $(HEADERS)
+	$(CC) $(CFLAGS) -c $(DRIVER_FILE)
+
 # Rule to compile parser.c
 $(PARSER_FILE:.c=.o): $(PARSER_FILE) $(LEX_C_FILE) $(HEADERS)
 	$(CC) $(CFLAGS) -c $(PARSER_FILE)
+
+# Rule to compile hashtable.h
+$(HASHTABLE_FILE:.c=.o): $(HASHTABLE_FILE) $(HEADERS)
+	$(CC) $(CFLAGS) -c $(HASHTABLE_FILE)
+
+# Rule to compile symbol_table.c
+$(SYMBOL_TABLE_FILE:.c=.o): $(SYMBOL_TABLE_FILE) $(HEADERS)
+	$(CC) $(CFLAGS) -c $(SYMBOL_TABLE_FILE)
 
 # Rule to compile ast.c
 $(AST_FILE:.c=.o): $(AST_FILE) $(HEADERS)

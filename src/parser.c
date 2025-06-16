@@ -4,12 +4,22 @@
 #include "tokens.h"
 #include "ast.h"
 #include "symbol_table.h"
+#include "parser.h"
+
+// External from lexer
+extern FILE *yyin;
+extern char* yyfilename;
+extern int error_count;
+extern int lineno;
+extern int yylex();
+extern void save_error_pos(char* type, char* token);
+extern void show_and_free_errors();
 
 ASTNode* program();
 ASTNode* external_declaration();
 ASTNode* declarations(ASTNode* type_node, Symbol* id_sym);
-ASTNode* function_definition_body(ASTNode* type_node, Symbol* func_sym); // New helper, returns ASTNode*
-ASTNode* variable_declaration_global_body(ASTNode* type_node, Symbol* first_var_sym); // New helper, returns ASTNode*
+ASTNode* function_definition_body(ASTNode* type_node, Symbol* func_sym);
+ASTNode* variable_declaration_global_body(ASTNode* type_node, Symbol* first_var_sym);
 ASTNode* parameter_list_opt();
 ASTNode* parameter_list();
 ASTNode* parameter_declaration();
@@ -36,22 +46,17 @@ ASTNode* if_statement();
 ASTNode* while_statement();
 ASTNode* return_statement();
 
-FILE *log_file; // Log file for parser output
+// --- Main Driver --- (This section will be replaced)
 
-extern FILE *yyin;   // Input stream
-extern char* yyfilename;
-extern int yylex();
-extern void save_error_pos(char* type, char* token);
-extern int error_count;
-extern int lineno;
-extern void show_and_free_errors();
-
+// Global variables used by the parser
 YYSTYPE yylval;
+ASTNode *ast_root = NULL;
+sym_t *global_sym_table = NULL;
+sym_t *current_sym_table = NULL; // Tracks current scope
 int token;
-ASTNode* ast_root = NULL;
-sym_t* current_sym_table = NULL;
-sym_t* global_sym_table = NULL;
+FILE *log_file = NULL;
 
+// Error tracking for parser specific errors
 int is_in_follow_set(int* follow_set, int size);
 void error_recovery(int* follow_set, int size, const char* production_name);
 char* token_type_to_string(int token_type);
@@ -1194,7 +1199,7 @@ ASTNode* if_statement()
     {
         int follow_set[] = {LBRACE}; // Expect body next
         char error_msg[200];
-        sprintf(error_msg, "Expected \')\' after \'if\' condition, got %s", token_type_to_string(token)); // Corrected message
+        sprintf(error_msg, "Expected \')\' after \'if\' condition, got %s", token_type_to_string(token));
         save_error_pos("syntax error", error_msg);
         error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "if_statement_missing_rparen_cond");
         if (token != LBRACE) { free_ast(cond_node); return (ASTNode*)create_error_node(); }
@@ -1262,101 +1267,100 @@ ASTNode* return_statement()
 }
 
 // --- Main Driver ---
-void parse() 
+ParseResult parse_source_file(const char* source_filename)
 {
-    get_next_token();
-    ast_root = program();
-
-    if (token == EOF && error_count == 0) // Also check error_count
-    {
-        fprintf(log_file, "Parsing reached EOF as expected.\n"); // Changed to log_file
-        // printf("Parsing reached EOF as expected.\\n");
-    } 
-    else if (token != EOF)
-    {
-        char error_msg[200];
-        sprintf(error_msg, "Unexpected token %s at end of input instead of EOF",
-                token_type_to_string(token));
-        save_error_pos("syntax error", error_msg);
-        fprintf(log_file, "Error: %s\n", error_msg);
-    }
-}
-
-int main(int argc, char **argv) 
-{
+    ParseResult result = {0, NULL, NULL}; // Initialize result
 
     log_file = fopen("parser_logs.txt", "w");
-
-    if(!log_file) 
-    {
+    if (!log_file) {
         perror("Failed to open log file");
-        return 1;
+        result.error_count = -1; // Indicate fatal error
+        return result;
     }
 
-    if (argc > 1) 
+    if (source_filename != NULL && source_filename[0] != '\0') 
     {
-        yyin = fopen(argv[1], "r");
-        yyfilename = argv[1];
+        yyin = fopen(source_filename, "r");
         if (!yyin) 
         {
-            perror(argv[1]);
-            return 1;
+            perror(source_filename);
+            fclose(log_file);
+            result.error_count = -1; // Indicate fatal error
+            return result;
         }
+        yyfilename = (char*)source_filename; // Keep const char* for filename
     } 
     else 
     {
-        printf("No input file specified. Reading from stdin.\n");
+        fprintf(stderr, "No input file specified. Reading from stdin (not fully supported for all features yet).\\n");
         yyin = stdin;
+        yyfilename = "stdin";
     }
 
+    // Initialize symbol table
     global_sym_table = create_symbol_table();
-    if(!global_sym_table)
+    if (!global_sym_table) 
     {
         perror("FATAL: Could not create global symbol table!");
-        if(log_file) fclose(log_file);
-        return 1;
+        if (yyin != stdin) fclose(yyin);
+        fclose(log_file);
+        result.error_count = -1; // Indicate fatal error
+        return result;
     }
     global_sym_table->parent = NULL;
     global_sym_table->depth = 0;
     current_sym_table = global_sym_table;
-    fprintf(log_file, "Initialized global scope. Depth: %d, Addr: %p\\n",
+    fprintf(log_file, "Initialized global scope. Depth: %d, Addr: %p\n",
             current_sym_table->depth, (void*)current_sym_table);
 
-    parse();
+    // Reset error count for this parse run (if it's global and shared with lexer)
+    // error_count = 0; // Assuming error_count is reset by lexer or should be reset here.
+                     // The provided code shows error_count in scanner.l, so it might persist.
+                     // For now, let's assume it's reset or handled by the lexer for each new yyparse like call.
+                     // If not, it should be reset: error_count = 0; and parser's internal current_error_count = 0;
 
+    get_next_token();
+    ast_root = program(); // This will set the global ast_root
 
-    if(error_count > 0) 
+    if (token == EOF && error_count == 0) 
     {
-        printf("Parsing completed with %d errors.\n", error_count);
-        show_and_free_errors();
+        fprintf(log_file, "Parsing reached EOF as expected.\n");
     } 
-    else 
+    else if (token != EOF) 
     {
-        printf("Parsing completed, but AST generation might have failed or resulted in an error node at root.\n");
+        char error_msg[200];
+        sprintf(error_msg, "Unexpected token %s at end of input instead of EOF",
+                token_type_to_string(token));
+        // Using parser's save_error_pos if it's the one that increments global error_count
+        // or if a unified error reporting is desired.
+        // For now, assuming save_error_pos in parser.c updates the global error_count.
+        save_error_pos("syntax error", error_msg);
+        fprintf(log_file, "Error: %s\\n", error_msg);
     }
 
-    if (ast_root) 
+    result.error_count = error_count;
+    result.ast_root = ast_root;
+    result.global_sym_table = global_sym_table;
+
+    // IMPORTANT: AST root and global symbol table are NOT freed here.
+    // The caller (driver.c) is responsible for freeing them.
+
+    if (log_file) 
     {
-        fprintf(log_file, "AST construction complete. Root type: %d. AST freeing is commented out for now.\n", ast_root->type);
-        visualize_ast(ast_root, "ast_output.dot");
-        free_ast(ast_root);
+        fclose(log_file);
+        log_file = NULL;
     }
-
-    // Display the entire symbol table tree from the root
-    if (global_sym_table) 
+    if (yyin != stdin && yyin != NULL) 
     {
-        printf("Attempting to display entire symbol tree:\n"); // Debug print
-        show_entire_symbol_tree(global_sym_table);
-    } 
-    else 
-    {
-        printf("current_sym_table is NULL, cannot display tree.\n"); // Debug print
+        fclose(yyin);
+        yyin = NULL;
     }
+    
+    // Reset globals for potential re-entry if the parser were part of a library
+    // though for a compiler main, this is less critical.
+    // ast_root = NULL; // Driver has a copy
+    // global_sym_table = NULL; // Driver has a copy
+    // current_sym_table = NULL;
 
-    // Free all symbol tables (root and all its children)
-    free_all_symbol_tables(global_sym_table);
-
-
-    fclose(log_file);
-    return error_count > 0 ? 1 : 0; // Return non-zero on error
+    return result;
 }

@@ -4,6 +4,8 @@
 typedef struct {
     char* name;
     int tag;
+    int num_params;
+    int* type_list;
     // TODO : offset ?
 } Symbol;
 

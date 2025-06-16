@@ -13,7 +13,7 @@ Symbol* create_sym(const char* name, int tag)
         return NULL;
     }
 
-    s->name = strdup(name); // Duplicate the string
+    s->name = strdup(name);
     if (!s->name) 
     {
         perror("Failed to duplicate name for Symbol");
@@ -22,6 +22,8 @@ Symbol* create_sym(const char* name, int tag)
     }
 
     s->tag = tag;
+    s->num_params = 0;
+    s->type_list = NULL;
 
     return s;
 }
@@ -56,6 +58,7 @@ void free_sym(Symbol *s)
 {
     if (!s) return;
     free(s->name);
+    free(s->type_list);
 
     // TODO : and other fields if needed
 

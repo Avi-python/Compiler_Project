@@ -5,6 +5,7 @@
 #include "reswords.h"
 
 extern void yyerror(const char *s); 
+extern YYSTYPE yylval;
 
 void save_error_pos(char* type, char* token);
 void free_errors_arr();
