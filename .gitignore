@@ -19,5 +19,8 @@ src/parser_logs.txt
 # obsidian
 .obsidian
 
+# for windows development
+tools/
+
 # Other generated files
 # If you have other generated files, add them here

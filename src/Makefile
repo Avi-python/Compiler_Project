@@ -6,8 +6,8 @@ GPERF = gperf
 # Directories
 INCLUDE_DIR = ../include
 
-# LLVM configuration
-LLVM_CONFIG = llvm-config
+# LLVM configuration - Use LLVM-14 specifically
+LLVM_CONFIG = llvm-config-14
 LLVM_CFLAGS = $(shell $(LLVM_CONFIG) --cflags)
 LLVM_LDFLAGS = $(shell $(LLVM_CONFIG) --ldflags --libs core)
 

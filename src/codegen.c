@@ -264,6 +264,35 @@ static LLVMTypeRef get_llvm_type(TypeNode* type_node)
     }
 }
 
+// Helper function to get the element type from a global variable (LLVM-14 compatible)
+static LLVMTypeRef get_global_variable_type(LLVMValueRef global_var) 
+{
+    if (!global_var) return NULL;
+    
+    // In LLVM-14, we need to use LLVMGetElementType with the global's type
+    LLVMTypeRef global_ptr_type = LLVMTypeOf(global_var);
+    return LLVMGetElementType(global_ptr_type);
+}
+
+// Helper function to get the allocated type from an alloca (LLVM-14 compatible)
+static LLVMTypeRef get_alloca_type(LLVMValueRef alloca_inst) 
+{
+    if (!alloca_inst) return NULL;
+    
+    // In LLVM-14, we need to use LLVMGetElementType with the alloca's type
+    LLVMTypeRef alloca_ptr_type = LLVMTypeOf(alloca_inst);
+    return LLVMGetElementType(alloca_ptr_type);
+}
+
+// Helper function to get function type from function value (LLVM-14 compatible)
+static LLVMTypeRef get_function_type(LLVMValueRef func) 
+{
+    if (!func) return NULL;
+    
+    // In LLVM-14, we need to use LLVMGetElementType with the function's type
+    LLVMTypeRef func_ptr_type = LLVMTypeOf(func);
+    return LLVMGetElementType(func_ptr_type);
+}
 
 static LLVMValueRef generate_node(ASTNode* node) 
 {
@@ -457,15 +486,16 @@ static LLVMValueRef generate_node(ASTNode* node)
             LLVMValueRef var_ref = get_scoped_variable(id_node->symbol->name);
             if (var_ref && LLVMGetInstructionOpcode(var_ref) == LLVMAlloca) 
             {
-                // Local variable - load from alloca
-                return LLVMBuildLoad2(llvm_builder, LLVMGetAllocatedType(var_ref), var_ref, id_node->symbol->name);
+                // Local variable - load from alloca (LLVM-14 compatible)
+                LLVMTypeRef alloca_type = get_alloca_type(var_ref);
+                return LLVMBuildLoad(llvm_builder, var_ref, id_node->symbol->name);
             } 
 
-            // Global variable - load from global
-            LLVMTypeRef global_type = LLVMGetElementType(LLVMGetNamedGlobal(llvm_module, id_node->symbol->name));
-            if(global_type) 
+            // Global variable - load from global (LLVM-14 compatible)
+            LLVMValueRef global_var = LLVMGetNamedGlobal(llvm_module, id_node->symbol->name);
+            if (global_var) 
             {
-                return LLVMBuildLoad2(llvm_builder, global_type, LLVMGetNamedGlobal(llvm_module, id_node->symbol->name), id_node->symbol->name);
+                return LLVMBuildLoad(llvm_builder, global_var, id_node->symbol->name);
             }
 
             fprintf(stderr, "CodeGen Error: Identifier %s not found or not loadable.\n", id_node->symbol->name);
@@ -627,7 +657,8 @@ static LLVMValueRef generate_node(ASTNode* node)
                 current_arg_ast = current_arg_ast->next;
             }
 
-            LLVMTypeRef func_type = LLVMGlobalGetValueType(func_to_call);
+            // LLVM-14 compatible function call
+            LLVMTypeRef func_type = get_function_type(func_to_call);
             LLVMTypeRef func_return_type = LLVMGetReturnType(func_type); // Get function's declared return type
 
             const char *call_name = "";
@@ -636,7 +667,8 @@ static LLVMValueRef generate_node(ASTNode* node)
                  call_name = "calltmp"; // Name the result if it's not void
             }
 
-            LLVMValueRef call_val = LLVMBuildCall2(llvm_builder, func_type, func_to_call, args, arg_count, call_name);
+            // Use LLVMBuildCall instead of LLVMBuildCall2 for LLVM-14 compatibility
+            LLVMValueRef call_val = LLVMBuildCall(llvm_builder, func_to_call, args, arg_count, call_name);
             free(args);
             return call_val;
         }

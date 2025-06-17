@@ -125,6 +125,28 @@ int execute_command(const char* command, int verbose)
 int compile_ir_to_executable(const char* ir_file, const char* output_file, int verbose) 
 {
     char command[1024];
+    
+#ifdef WINDOWS_BUILD
+    // For Windows, we need to instruct users to install clang or use direct LLVM-C compilation
+    // This is a temporary solution - the better approach is to use LLVM-C API directly
+    printf("Note: To compile LLVM IR on Windows, you need clang installed.\n");
+    printf("You can either:\n");
+    printf("1. Install LLVM from https://releases.llvm.org/\n");
+    printf("2. Use this compiler with -S flag to generate .ll files only\n");
+    
+    // Try to use clang from PATH first
+    sprintf(command, "clang %s -o %s", ir_file, output_file);
+    if (execute_command(command, verbose) != 0) {
+        printf("Failed to find 'clang' in PATH. Attempting alternative methods...\n");
+        
+        // Alternative: try cl.exe (MSVC) if available
+        sprintf(command, "cl %s /Fe:%s", ir_file, output_file);
+        if (execute_command(command, verbose) != 0) {
+            fprintf(stderr, "No suitable compiler found. Please install LLVM/Clang or MSVC.\n");
+            return 1;
+        }
+    }
+#else
     char temp_obj_file[256];
     
     // Create temporary object file name
@@ -144,6 +166,7 @@ int compile_ir_to_executable(const char* ir_file, const char* output_file, int v
     
     // Clean up temporary object file
     unlink(temp_obj_file);
+#endif
     
     if (verbose) printf("Successfully created executable: %s\n", output_file);
     
@@ -154,9 +177,22 @@ int compile_ir_to_object(const char* ir_file, const char* output_file, int verbo
 {
     char command[1024];
     
-    // Compile LLVM IR to object file
+#ifdef WINDOWS_BUILD
+    // Try to use clang from PATH first
+    sprintf(command, "clang -c %s -o %s", ir_file, output_file);
+    if (execute_command(command, verbose) != 0) {
+        printf("Failed to find 'clang' in PATH.\n");
+        printf("Note: To compile LLVM IR to object files on Windows, you need clang installed.\n");
+        printf("Install LLVM from https://releases.llvm.org/ and add it to PATH.\n");
+        return 1;
+    }
+#else
+    // Compile LLVM IR to object file using llc on Linux
     sprintf(command, "llc -filetype=obj %s -o %s", ir_file, output_file);
     return execute_command(command, verbose);
+#endif
+    
+    return 0;
 }
 
 // Function declarations for semantic analysis
