@@ -310,9 +310,10 @@ void analyze_function_definition(FunctionDefinitionNode* node, sym_t* symbol_tab
     // Check if non-void function has return statement
     if (return_type != VOID) 
     {
-        if (!has_return_statement(node->body)) {
+        if (!function_has_complete_return_coverage(node->body))
+        {
             char error_msg[256];
-            sprintf(error_msg, "Function '%s' with non-void return type must have a return statement", 
+            sprintf(error_msg, "Function '%s' with non-void return type all paths must have a return statement", 
                     func_name->symbol->name);
             save_error_details("semantic error", error_msg, node->base.lineno, node->base.colno, yyfilename);
             semantic_error_count++;
@@ -649,39 +650,72 @@ const char* type_to_string(int type)
     }
 }
 
+// Updated function to check if ALL execution paths have return statements
+// This is crucial for non-void functions to ensure they always return a value
 int has_return_statement(ASTNode* node) 
 {
     if (!node) return 0;
     
     if (node->type == NODE_RETURN_STATEMENT) return 1;
     
-    // Recursively check compound statements and other containers
     switch (node->type) 
     {
         case NODE_COMPOUND_STATEMENT: 
         {
             CompoundStatementNode* cs = (CompoundStatementNode*)node;
-            if (has_return_statement(cs->start)) return 1;
-            break;
+            ASTNode* current = cs->start;
+            while (current) 
+            {
+                if (has_return_statement(current)) return 1;
+                current = current->next;
+            }
+            return 0;
         }
         case NODE_IF_STATEMENT: 
         {
             IfStatementNode* if_node = (IfStatementNode*)node;
-            if (has_return_statement(if_node->body)) return 1;
-            if (has_return_statement(if_node->else_body)) return 1;
-            break;
+            int then_has_return = has_return_statement(if_node->body);
+            
+            if (if_node->else_body) 
+            {
+                int else_has_return = has_return_statement(if_node->else_body);
+                return then_has_return && else_has_return;
+            } else 
+            {
+                return 0;
+            }
         }
         case NODE_WHILE_STATEMENT: 
         {
-            WhileStatementNode* while_node = (WhileStatementNode*)node;
-            if (has_return_statement(while_node->body)) return 1;
-            break;
+            // While loops cannot guarantee that their body will execute
+            // Therefore, they cannot guarantee a return statement
+            // Even if the body has a return, the loop might not execute at all
+            return 0;
         }
+        case NODE_PROGRAM:
+        case NODE_FUNCTION_DEFINITION:
+        case NODE_GLOBAL_VARIABLE_DECLARATION:
+        case NODE_LOCAL_VARIABLE_DECLARATION:
+        case NODE_VARIABLE_DECLARATOR:
+        case NODE_PARAMETER:
+        case NODE_ASSIGNMENT_STATEMENT:
+        case NODE_BINARY_EXPRESSION:
+        case NODE_FUNCTION_CALL:
+        case NODE_IDENTIFIER:
+        case NODE_NUMBER_LITERAL:
+        case NODE_TYPE:
+        case NODE_ERROR:
+        default:
+            // These node types don't contain return statements
+            return 0;
     }
+}
+
+int function_has_complete_return_coverage(ASTNode* function_body) 
+{
+    if (!function_body) return 0;
     
-    if (node->next && has_return_statement(node->next)) return 1;
-    
-    return 0;
+    return has_return_statement(function_body);
 }
 
 int main(int argc, char **argv) 

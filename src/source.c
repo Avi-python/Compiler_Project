@@ -1,14 +1,15 @@
 int a = 13;
 
-int fib(int x)
+int helper(int x, int y)
 {
-    if(x == 1) { return 1; }
-    if(x == 2) { return 1; }
-    return fib(x - 1) + fib(x - 2);
+    if(x > 1)
+    {
+        return x + y;
+    }
 }
 
 int main()
 {
-    int result = fib(a);
+    int result = helper(a, 5);
     return result;
 }

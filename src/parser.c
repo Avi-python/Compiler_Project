@@ -803,7 +803,8 @@ ASTNode* function_call_statement(Symbol* id_sym)
         save_error_lexer_pos("syntax error", error_msg);
         error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "function_call_statement_rparen");
         // If RPAREN missing, proceed if recovery finds SEMI, otherwise error
-        if (token != SEMI) { // A more robust check might be needed
+        if (token != SEMI) 
+        {
             free_ast(id_node); free_ast(args_node);
             return (ASTNode*)create_error_node(lineno, column);
         }
