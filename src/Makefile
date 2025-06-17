@@ -6,10 +6,15 @@ GPERF = gperf
 # Directories
 INCLUDE_DIR = ../include
 
+# LLVM configuration
+LLVM_CONFIG = llvm-config
+LLVM_CFLAGS = $(shell $(LLVM_CONFIG) --cflags)
+LLVM_LDFLAGS = $(shell $(LLVM_CONFIG) --ldflags --libs core)
+
 # Compiler flags (add -g for debugging, -Wall for warnings, -I for include directory)
-CFLAGS = -Wall -g -I$(INCLUDE_DIR)
+CFLAGS = -Wall -g -I$(INCLUDE_DIR) $(LLVM_CFLAGS)
 # Linker flags
-LDFLAGS = -lfl
+LDFLAGS = -lfl $(LLVM_LDFLAGS)
 
 # Target executable
 TARGET = compiler
@@ -22,6 +27,7 @@ SYMBOL_FILE = symbol.c
 DRIVER_FILE = driver.c
 HASHTABLE_FILE = hashtable.c
 SYMBOL_TABLE_FILE = symbol_table.c
+CODEGEN_FILE = codegen.c
 RESWORDS_GPERF_FILE = reswords.gperf
 
 # Generated C file from Flex
@@ -36,8 +42,7 @@ HEADERS = \
 	$(INCLUDE_DIR)/hashtable.h \
 	$(INCLUDE_DIR)/error.h \
 	$(INCLUDE_DIR)/parser.h \
-	$(INCLUDE_DIR)/hashtable.h \
-	$(INCLUDE_DIR)/symbol_table.h
+	$(INCLUDE_DIR)/codegen.h
 
 RESWORDS_H_FILE = reswords.h
 
@@ -49,6 +54,7 @@ OBJS = \
 	$(PARSER_FILE:.c=.o) \
 	$(AST_FILE:.c=.o) \
 	$(SYMBOL_FILE:.c=.o) \
+	$(CODEGEN_FILE:.c=.o) \
 	lex.yy.o
 
 # Default target: build the executable
@@ -66,7 +72,7 @@ $(DRIVER_FILE:.c=.o): $(DRIVER_FILE) $(HEADERS)
 $(PARSER_FILE:.c=.o): $(PARSER_FILE) $(LEX_C_FILE) $(HEADERS)
 	$(CC) $(CFLAGS) -c $(PARSER_FILE)
 
-# Rule to compile hashtable.h
+# Rule to compile hashtable.c
 $(HASHTABLE_FILE:.c=.o): $(HASHTABLE_FILE) $(HEADERS)
 	$(CC) $(CFLAGS) -c $(HASHTABLE_FILE)
 
@@ -81,6 +87,10 @@ $(AST_FILE:.c=.o): $(AST_FILE) $(HEADERS)
 # Rule to compile symbol.c
 $(SYMBOL_FILE:.c=.o): $(SYMBOL_FILE) $(HEADERS)
 	$(CC) $(CFLAGS) -c $(SYMBOL_FILE)
+
+# Rule to compile codegen.c
+$(CODEGEN_FILE:.c=.o): $(CODEGEN_FILE) $(HEADERS)
+	$(CC) $(CFLAGS) -c $(CODEGEN_FILE)
 
 # Rule to compile the generated lexer
 lex.yy.o: $(LEX_C_FILE) $(HEADERS)
@@ -101,7 +111,7 @@ scanner_test: scanner_test.c $(LEX_C_FILE) $(HEADERS)
 
 # Target to clean up generated files
 clean:
-	rm -f $(TARGET) scanner_test $(LEX_C_FILE) $(RESWORDS_H_FILE) *.o parser_logs.txt symbol_table_logs.txt ast_output.dot ast.png
+	rm -f $(TARGET) scanner_test $(LEX_C_FILE) $(RESWORDS_H_FILE) *.o *.ll *.tmp.* parser_logs.txt symbol_table_logs.txt ast_output.dot ast.png
 
 # Target to rebuild everything from scratch
 rebuild: clean all

@@ -1,21 +1,14 @@
-int a, b, c = 13 + + 7;
+int a = 13;
 
-int helper(int x, int y)
+int fib(int x)
 {
-    int z = x + y;
+    if(x == 1) { return 1; }
+    if(x == 2) { return 1; }
+    return fib(x - 1) + fib(x - 2);
 }
 
 int main()
 {
-    int x;
-    int x, y, z = 2 * a;
-    if(a < c)
-    {
-        b = a + c;
-    } 
-    else
-    {
-        b = a - c;
-    }
-    return 0;
+    int result = fib(a);
+    return result;
 }

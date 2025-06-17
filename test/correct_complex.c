@@ -41,5 +41,5 @@ void testScoping() {
 int main() {
     int result = testExpressions();
     testScoping();
-    return 0;
+    return result;
 }
