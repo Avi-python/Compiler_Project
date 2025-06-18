@@ -219,20 +219,19 @@ int codegen_generate(ASTNode* ast_root, sym_t* global_symbol_table)
 
 void codegen_to_object()
 {
+    // Initialize all common target architectures for better cross-platform support
     LLVMInitializeX86TargetInfo();
     LLVMInitializeX86Target();
     LLVMInitializeX86TargetMC();
     LLVMInitializeX86AsmPrinter();
     LLVMInitializeX86AsmParser();
 
-
-    // 步驟 2: 獲取目標資訊並建立 TargetMachine
-    char* targetTriple = LLVMGetDefaultTargetTriple(); // 獲取本機的目標三元組
+    char* targetTriple = LLVMGetDefaultTargetTriple();
     LLVMTargetRef target;
     char* error = NULL;
 
-    // 根據三元組尋找目標
-    if (LLVMGetTargetFromTriple(targetTriple, &target, &error)) {
+    if (LLVMGetTargetFromTriple(targetTriple, &target, &error)) 
+    {
         fprintf(stderr, "Failed to get target from triple: %s\n", error);
         LLVMDisposeMessage(error);
         LLVMDisposeMessage(targetTriple);
@@ -247,7 +246,7 @@ void codegen_to_object()
         cpu,
         features,
         LLVMCodeGenLevelDefault,
-        LLVMRelocDefault,
+        LLVMRelocPIC,
         LLVMCodeModelDefault
     );
 
@@ -261,7 +260,6 @@ void codegen_to_object()
 
     char* errorMessage = NULL;
 
-    // Step 3: Emit the object file
     if (LLVMTargetMachineEmitToFile(machine, llvm_module, (char*)filename, LLVMObjectFile, &errorMessage)) 
     {
         fprintf(stderr, "Failed to emit object file: %s\n", errorMessage);
@@ -273,7 +271,6 @@ void codegen_to_object()
 
     printf("Successfully compiled module to %s\n", filename);
 
-    // Step 4: Clean up resources
     LLVMDisposeTargetMachine(machine);
     LLVMDisposeMessage(targetTriple);
 }
@@ -286,12 +283,10 @@ void codegen_to_assembly()
     LLVMInitializeX86AsmPrinter();
     LLVMInitializeX86AsmParser();
 
-    // Get target information and create TargetMachine
     char* targetTriple = LLVMGetDefaultTargetTriple();
     LLVMTargetRef target;
     char* error = NULL;
 
-    // Find target from triple
     if (LLVMGetTargetFromTriple(targetTriple, &target, &error)) {
         fprintf(stderr, "Failed to get target from triple: %s\n", error);
         LLVMDisposeMessage(error);
@@ -307,16 +302,14 @@ void codegen_to_assembly()
         cpu,
         features,
         LLVMCodeGenLevelDefault,
-        LLVMRelocDefault,
+        LLVMRelocPIC,
         LLVMCodeModelDefault
     );
 
-    // Determine assembly output filename
     const char* filename = "output.s";
 
     char* errorMessage = NULL;
 
-    // Emit assembly file
     if (LLVMTargetMachineEmitToFile(machine, llvm_module, (char*)filename, LLVMAssemblyFile, &errorMessage)) 
     {
         fprintf(stderr, "Failed to emit assembly file: %s\n", errorMessage);
@@ -328,7 +321,6 @@ void codegen_to_assembly()
 
     printf("Successfully compiled module to assembly: %s\n", filename);
 
-    // Clean up resources
     LLVMDisposeTargetMachine(machine);
     LLVMDisposeMessage(targetTriple);
 }
@@ -590,8 +582,20 @@ static LLVMValueRef generate_node(ASTNode* node)
                         printf_func = LLVMAddFunction(llvm_module, "printf", printf_type);
                     }
                     
-                    // Create format string "%d\n" for integers
-                    LLVMValueRef format_str = LLVMBuildGlobalStringPtr(llvm_builder, "%d\n", "fmt");
+                    // Create format string "%d\n" for integers - FIX: Use global string instead of BuildGlobalStringPtr
+                    LLVMValueRef format_str_global = LLVMGetNamedGlobal(llvm_module, "printf_fmt");
+                    if (!format_str_global) {
+                        // Create a global constant string
+                        LLVMValueRef fmt_string = LLVMConstStringInContext(llvm_context, "%d\n", 3, 0);
+                        format_str_global = LLVMAddGlobal(llvm_module, LLVMTypeOf(fmt_string), "printf_fmt");
+                        LLVMSetInitializer(format_str_global, fmt_string);
+                        LLVMSetLinkage(format_str_global, LLVMPrivateLinkage);
+                        LLVMSetGlobalConstant(format_str_global, 1);
+                    }
+                    
+                    // Get pointer to the string
+                    LLVMValueRef format_str = LLVMBuildBitCast(llvm_builder, format_str_global, 
+                                                            LLVMPointerType(LLVMInt8TypeInContext(llvm_context), 0), "fmt_ptr");
                     
                     // Call printf with format string and value
                     LLVMValueRef printf_args[] = {format_str, expr_val};
@@ -846,7 +850,7 @@ static LLVMValueRef generate_node(ASTNode* node)
                     }
                     else
                     {
-                        fprintf(stderr, "CodeGen Warning: Global variable %s initializer is not a constant literal. Not supported in this simplified version.\\n", var_name_node->symbol->name);
+                        fprintf(stderr, "CodeGen Warning: Global variable %s initializer is not a constant literal. Not supported in this simplified version.\n", var_name_node->symbol->name);
                         LLVMSetInitializer(global_var, LLVMConstNull(llvm_type)); // Default to zero/null
                     }
                 } 
