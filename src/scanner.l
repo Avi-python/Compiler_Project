@@ -111,8 +111,36 @@ invalid_char_literal \'([^'\\]|\\.)([^'\\]|\\.)+\'
     return CHAR_LITERAL; // Return null character to avoid further processing
 }
 {string}         { 
-    yylval.sval = strdup(yytext); 
     column += yyleng; 
+    // Remove surrounding quotes and handle escape sequences
+    int len = strlen(yytext);
+    char *str = malloc(len - 1); // Allocate space for string without quotes
+    int j = 0;
+    
+    // Copy string content, processing escape sequences
+    for (int i = 1; i < len - 1; i++) { // Skip first and last quote
+        if (yytext[i] == '\\' && i + 1 < len - 1) {
+            switch(yytext[i + 1]) {
+                case 'n': str[j++] = '\n'; break;
+                case 't': str[j++] = '\t'; break;
+                case 'r': str[j++] = '\r'; break;
+                case 'b': str[j++] = '\b'; break;
+                case 'f': str[j++] = '\f'; break;
+                case 'v': str[j++] = '\v'; break;
+                case 'a': str[j++] = '\a'; break;
+                case '\\': str[j++] = '\\'; break;
+                case '\'': str[j++] = '\''; break;
+                case '\"': str[j++] = '\"'; break;
+                case '0': str[j++] = '\0'; break;
+                default: str[j++] = yytext[i + 1]; break;
+            }
+            i++; // Skip the next character as it's part of escape sequence
+        } else {
+            str[j++] = yytext[i];
+        }
+    }
+    str[j] = '\0'; // Null-terminate the string
+    yylval.sval = str;
     return STRING_LITERAL; 
 }
 

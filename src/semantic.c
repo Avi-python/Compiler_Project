@@ -158,6 +158,7 @@ void analyze_variable_declaration(ASTNode* node, sym_t* symbol_table)
                     save_error_details("semantic error", error_msg, vd->base.lineno, vd->base.colno, yyfilename);
                     semantic_error_count++;
                 }
+                analyze_node(vd->expression, symbol_table);
             }
         }
         current = current->next;
@@ -298,11 +299,26 @@ void analyze_binary_expression(BinaryExpressionNode* node, sym_t* symbol_table)
     
     if (node->op == PLUS || node->op == MINUS || node->op == MUL || node->op == DIV) 
     {
-        if ((left_type != INT && left_type != CHAR) || 
-            (right_type != INT && right_type != CHAR)) 
+        // Check for string literals in arithmetic operations
+        if (left_type == STRING_LITERAL || right_type == STRING_LITERAL) 
         {
             char error_msg[256];
-            sprintf(error_msg, "Arithmetic operation requires numeric operands");
+            if (node->op == PLUS) {
+                sprintf(error_msg, "Cannot perform addition with string literals. String concatenation is not supported.");
+            } else {
+                sprintf(error_msg, "Cannot perform arithmetic operation (%s) with string literals", 
+                        node->op == MINUS ? "subtraction" : 
+                        node->op == MUL ? "multiplication" : "division");
+            }
+            save_error_details("semantic error", error_msg, node->base.lineno, node->base.colno, yyfilename);
+            semantic_error_count++;
+        }
+        else if ((left_type != INT && left_type != CHAR) || 
+                 (right_type != INT && right_type != CHAR)) 
+        {
+            char error_msg[256];
+            sprintf(error_msg, "Arithmetic operation requires numeric operands, got %s and %s",
+                    type_to_string(left_type), type_to_string(right_type));
             save_error_details("semantic error", error_msg, node->base.lineno, node->base.colno, yyfilename);
             semantic_error_count++;
         }
@@ -359,6 +375,11 @@ int get_node_type(ASTNode* node, sym_t* symbol_table)
         }
         case NODE_NUMBER_LITERAL:
             return INT;
+        case NODE_STRING_LITERAL:
+        {
+            printf("hi\n");
+            return STRING_LITERAL;
+        }
         case NODE_BINARY_EXPRESSION: 
         {
             BinaryExpressionNode* bin_node = (BinaryExpressionNode*)node;
@@ -471,6 +492,7 @@ const char* type_to_string(int type)
         case INT: return "int";
         case CHAR: return "char";
         case VOID: return "void";
+        case STRING_LITERAL: return "string";
         default: return "unknown";
     }
 }

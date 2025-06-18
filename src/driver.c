@@ -134,7 +134,6 @@ int main(int argc, char **argv)
         if (result.ast_root) 
         {
             visualize_ast(result.ast_root, "ast_output.dot");
-            printf("AST visualization saved to: ast_output.dot\n");
         }
         
         if (result.global_sym_table) 
