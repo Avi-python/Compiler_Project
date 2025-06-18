@@ -25,7 +25,6 @@ typedef struct {
     char* input_file;
     char* output_file;
     int generate_ir_only;     // -S flag: generate LLVM IR only
-    int compile_only;         // -c flag: compile to object file only
     int verbose;              // -v flag: verbose output
     int help;                 // -h flag: show help
 } CompilerOptions;
@@ -36,7 +35,6 @@ void print_help(const char* program_name)
     printf("Options:\n");
     printf("  -o <file>    Specify output file name\n");
     printf("  -S           Generate LLVM IR only (.ll file)\n");
-    printf("  -c           Compile to object file only (.o file)\n");
     printf("  -v           Verbose output\n");
     printf("  -h           Show this help message\n");
     printf("\nExamples:\n");
@@ -59,9 +57,6 @@ CompilerOptions parse_arguments(int argc, char** argv)
                 break;
             case 'S':
                 opts.generate_ir_only = 1;
-                break;
-            case 'c':
-                opts.compile_only = 1;
                 break;
             case 'v':
                 opts.verbose = 1;
@@ -96,10 +91,6 @@ char* get_output_filename(const CompilerOptions* opts)
     {
         sprintf(output_name, "%s.ll", base_name);
     } 
-    else if (opts->compile_only) 
-    {
-        sprintf(output_name, "%s.o", base_name);
-    } 
     else 
     {
         strcpy(output_name, base_name);
@@ -120,79 +111,6 @@ int execute_command(const char* command, int verbose)
         fprintf(stderr, "Command was: %s\n", command);
     }
     return result;
-}
-
-int compile_ir_to_executable(const char* ir_file, const char* output_file, int verbose) 
-{
-    char command[1024];
-    
-#ifdef WINDOWS_BUILD
-    // For Windows, we need to instruct users to install clang or use direct LLVM-C compilation
-    // This is a temporary solution - the better approach is to use LLVM-C API directly
-    printf("Note: To compile LLVM IR on Windows, you need clang installed.\n");
-    printf("You can either:\n");
-    printf("1. Install LLVM from https://releases.llvm.org/\n");
-    printf("2. Use this compiler with -S flag to generate .ll files only\n");
-    
-    // Try to use clang from PATH first
-    sprintf(command, "clang %s -o %s", ir_file, output_file);
-    if (execute_command(command, verbose) != 0) {
-        printf("Failed to find 'clang' in PATH. Attempting alternative methods...\n");
-        
-        // Alternative: try cl.exe (MSVC) if available
-        sprintf(command, "cl %s /Fe:%s", ir_file, output_file);
-        if (execute_command(command, verbose) != 0) {
-            fprintf(stderr, "No suitable compiler found. Please install LLVM/Clang or MSVC.\n");
-            return 1;
-        }
-    }
-#else
-    char temp_obj_file[256];
-    
-    // Create temporary object file name
-    sprintf(temp_obj_file, "%s.tmp.o", output_file);
-    
-    // Compile LLVM IR to object file
-    sprintf(command, "llc -filetype=obj %s -o %s", ir_file, temp_obj_file);
-    if (execute_command(command, verbose) != 0) return 1;
-    
-    // Link object file to create executable
-    sprintf(command, "clang %s -o %s", temp_obj_file, output_file);
-    if (execute_command(command, verbose) != 0) 
-    {
-        unlink(temp_obj_file);  // Clean up temp file
-        return 1;
-    }
-    
-    // Clean up temporary object file
-    unlink(temp_obj_file);
-#endif
-    
-    if (verbose) printf("Successfully created executable: %s\n", output_file);
-    
-    return 0;
-}
-
-int compile_ir_to_object(const char* ir_file, const char* output_file, int verbose) 
-{
-    char command[1024];
-    
-#ifdef WINDOWS_BUILD
-    // Try to use clang from PATH first
-    sprintf(command, "clang -c %s -o %s", ir_file, output_file);
-    if (execute_command(command, verbose) != 0) {
-        printf("Failed to find 'clang' in PATH.\n");
-        printf("Note: To compile LLVM IR to object files on Windows, you need clang installed.\n");
-        printf("Install LLVM from https://releases.llvm.org/ and add it to PATH.\n");
-        return 1;
-    }
-#else
-    // Compile LLVM IR to object file using llc on Linux
-    sprintf(command, "llc -filetype=obj %s -o %s", ir_file, output_file);
-    return execute_command(command, verbose);
-#endif
-    
-    return 0;
 }
 
 // Function declarations for semantic analysis
@@ -795,7 +713,6 @@ int main(int argc, char **argv)
     
     // Print LLVM IR to file
     codegen_print_ir();
-    codegen_dispose();
     
     if (opts.verbose) printf("LLVM IR generated successfully: %s\n", ir_filename);
     
@@ -807,38 +724,13 @@ int main(int argc, char **argv)
         // Just generate IR - we're done
         printf("LLVM IR generated: %s\n", output_filename);
     }
-    else if (opts.compile_only) 
+    else
     {
         // Compile IR to object file
-        if (compile_ir_to_object(ir_filename, output_filename, opts.verbose) != 0) 
-        {
-            fprintf(stderr, "Failed to compile IR to object file.\n");
-            final_result = EXIT_FAILURE;
-        }
-        else
-        {
-            printf("Object file generated: %s\n", output_filename);
-        }
-        
-        // Clean up temporary IR file
-        if (!opts.generate_ir_only) unlink(ir_filename);
+        codegen_to_object();
     }
-    else 
-    {
-        // Compile IR to executable
-        if (compile_ir_to_executable(ir_filename, output_filename, opts.verbose) != 0) 
-        {
-            fprintf(stderr, "Failed to compile IR to executable.\n");
-            final_result = EXIT_FAILURE;
-        }
-        else 
-        {
-            printf("Executable generated: %s\n", output_filename);
-        }
-        
-        // Clean up temporary IR file
-        unlink(ir_filename);
-    }
+
+    codegen_dispose();
     
     // Generate additional output files if verbose
     if (opts.verbose) 

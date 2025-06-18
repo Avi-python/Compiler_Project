@@ -217,6 +217,67 @@ int codegen_generate(ASTNode* ast_root, sym_t* global_symbol_table)
     return 0;
 }
 
+void codegen_to_object()
+{
+    LLVMInitializeX86TargetInfo();
+    LLVMInitializeX86Target();
+    LLVMInitializeX86TargetMC();
+    LLVMInitializeX86AsmPrinter();
+    LLVMInitializeX86AsmParser();
+
+
+    // 步驟 2: 獲取目標資訊並建立 TargetMachine
+    char* targetTriple = LLVMGetDefaultTargetTriple(); // 獲取本機的目標三元組
+    LLVMTargetRef target;
+    char* error = NULL;
+
+    // 根據三元組尋找目標
+    if (LLVMGetTargetFromTriple(targetTriple, &target, &error)) {
+        fprintf(stderr, "Failed to get target from triple: %s\n", error);
+        LLVMDisposeMessage(error);
+        LLVMDisposeMessage(targetTriple);
+        return 1;
+    }
+
+    const char* cpu = "generic";
+    const char* features = "";
+    LLVMTargetMachineRef machine = LLVMCreateTargetMachine(
+        target,
+        targetTriple,
+        cpu,
+        features,
+        LLVMCodeGenLevelDefault,
+        LLVMRelocDefault,
+        LLVMCodeModelDefault
+    );
+
+
+    // Step 2: Determine output filename based on the target OS
+#if defined(_WIN32) || defined(_WIN64)
+    const char* filename = "output.obj";
+#else
+    const char* filename = "output.o";
+#endif
+
+    char* errorMessage = NULL;
+
+    // Step 3: Emit the object file
+    if (LLVMTargetMachineEmitToFile(machine, llvm_module, (char*)filename, LLVMObjectFile, &errorMessage)) 
+    {
+        fprintf(stderr, "Failed to emit object file: %s\n", errorMessage);
+        LLVMDisposeMessage(errorMessage);
+        LLVMDisposeTargetMachine(machine);
+        LLVMDisposeMessage(targetTriple);
+        return;
+    }
+
+    printf("Successfully compiled module to %s\n", filename);
+
+    // Step 4: Clean up resources
+    LLVMDisposeTargetMachine(machine);
+    LLVMDisposeMessage(targetTriple);
+}
+
 void codegen_print_ir() 
 {
     if (LLVMPrintModuleToFile(llvm_module, output_ir_filename, NULL)) 
