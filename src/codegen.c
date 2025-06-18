@@ -236,7 +236,7 @@ void codegen_to_object()
         fprintf(stderr, "Failed to get target from triple: %s\n", error);
         LLVMDisposeMessage(error);
         LLVMDisposeMessage(targetTriple);
-        return 1;
+        return;
     }
 
     const char* cpu = "generic";
@@ -274,6 +274,61 @@ void codegen_to_object()
     printf("Successfully compiled module to %s\n", filename);
 
     // Step 4: Clean up resources
+    LLVMDisposeTargetMachine(machine);
+    LLVMDisposeMessage(targetTriple);
+}
+
+void codegen_to_assembly()
+{
+    LLVMInitializeX86TargetInfo();
+    LLVMInitializeX86Target();
+    LLVMInitializeX86TargetMC();
+    LLVMInitializeX86AsmPrinter();
+    LLVMInitializeX86AsmParser();
+
+    // Get target information and create TargetMachine
+    char* targetTriple = LLVMGetDefaultTargetTriple();
+    LLVMTargetRef target;
+    char* error = NULL;
+
+    // Find target from triple
+    if (LLVMGetTargetFromTriple(targetTriple, &target, &error)) {
+        fprintf(stderr, "Failed to get target from triple: %s\n", error);
+        LLVMDisposeMessage(error);
+        LLVMDisposeMessage(targetTriple);
+        return;
+    }
+
+    const char* cpu = "generic";
+    const char* features = "";
+    LLVMTargetMachineRef machine = LLVMCreateTargetMachine(
+        target,
+        targetTriple,
+        cpu,
+        features,
+        LLVMCodeGenLevelDefault,
+        LLVMRelocDefault,
+        LLVMCodeModelDefault
+    );
+
+    // Determine assembly output filename
+    const char* filename = "output.s";
+
+    char* errorMessage = NULL;
+
+    // Emit assembly file
+    if (LLVMTargetMachineEmitToFile(machine, llvm_module, (char*)filename, LLVMAssemblyFile, &errorMessage)) 
+    {
+        fprintf(stderr, "Failed to emit assembly file: %s\n", errorMessage);
+        LLVMDisposeMessage(errorMessage);
+        LLVMDisposeTargetMachine(machine);
+        LLVMDisposeMessage(targetTriple);
+        return;
+    }
+
+    printf("Successfully compiled module to assembly: %s\n", filename);
+
+    // Clean up resources
     LLVMDisposeTargetMachine(machine);
     LLVMDisposeMessage(targetTriple);
 }
@@ -547,16 +602,15 @@ static LLVMValueRef generate_node(ASTNode* node)
             LLVMValueRef var_ref = get_scoped_variable(id_node->symbol->name);
             if (var_ref && LLVMGetInstructionOpcode(var_ref) == LLVMAlloca) 
             {
-                // Local variable - load from alloca (LLVM-14 compatible)
-                LLVMTypeRef alloca_type = get_alloca_type(var_ref);
-                return LLVMBuildLoad(llvm_builder, var_ref, id_node->symbol->name);
+                // Local variable - load from alloca
+                return LLVMBuildLoad2(llvm_builder, LLVMGetAllocatedType(var_ref), var_ref, id_node->symbol->name);
             } 
 
-            // Global variable - load from global (LLVM-14 compatible)
-            LLVMValueRef global_var = LLVMGetNamedGlobal(llvm_module, id_node->symbol->name);
-            if (global_var) 
+            // Global variable - load from global
+            LLVMTypeRef global_type = LLVMGetElementType(LLVMGetNamedGlobal(llvm_module, id_node->symbol->name));
+            if(global_type) 
             {
-                return LLVMBuildLoad(llvm_builder, global_var, id_node->symbol->name);
+                return LLVMBuildLoad2(llvm_builder, global_type, LLVMGetNamedGlobal(llvm_module, id_node->symbol->name), id_node->symbol->name);
             }
 
             fprintf(stderr, "CodeGen Error: Identifier %s not found or not loadable.\n", id_node->symbol->name);
@@ -718,8 +772,7 @@ static LLVMValueRef generate_node(ASTNode* node)
                 current_arg_ast = current_arg_ast->next;
             }
 
-            // LLVM-14 compatible function call
-            LLVMTypeRef func_type = get_function_type(func_to_call);
+            LLVMTypeRef func_type = LLVMGlobalGetValueType(func_to_call);
             LLVMTypeRef func_return_type = LLVMGetReturnType(func_type); // Get function's declared return type
 
             const char *call_name = "";
@@ -728,8 +781,7 @@ static LLVMValueRef generate_node(ASTNode* node)
                  call_name = "calltmp"; // Name the result if it's not void
             }
 
-            // Use LLVMBuildCall instead of LLVMBuildCall2 for LLVM-14 compatibility
-            LLVMValueRef call_val = LLVMBuildCall(llvm_builder, func_to_call, args, arg_count, call_name);
+            LLVMValueRef call_val = LLVMBuildCall2(llvm_builder, func_type, func_to_call, args, arg_count, call_name);
             free(args);
             return call_val;
         }

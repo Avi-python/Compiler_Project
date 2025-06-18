@@ -728,6 +728,7 @@ int main(int argc, char **argv)
     {
         // Compile IR to object file
         codegen_to_object();
+        codegen_to_assembly();
     }
 
     codegen_dispose();
