@@ -24,6 +24,7 @@
                 | <IfStatement>
                 | <WhileStatement>
                 | <ReturnStatement> ;
+                | <PrintStatement> ;
                 | epsilon
 
 <AssignOrFuncCall> ::= <AssignmentStatement> | <FunctionCallStatement>
@@ -66,15 +67,19 @@
               | / <Factor> <TermPrime>
               | epsilon
 
-<Factor> ::= <Identifier> <EpsilonOrFuncCall> | <Number> | ( <Expression> )
+<Factor> ::= <Identifier> <EpsilonOrFuncCall> | <Number> | <CharLiteral> | ( <Expression> )
 
 <EpsilonOrFuncCall> ::= epsilon | <FunctionCallStatement>
 
 <ReturnStatement> ::= return [ <Expression> ]
 
+<PrintStatement> ::= print ( <ArgumentListOpt> )
+
 <Identifier> ::= <Alpha> { <Alpha> | <Digit> }
 
 <Number> ::= <Digit> { <Digit> }                    
+
+<CharLiteral> ::= ' <Alpha> '
 
 <Type> ::= int | char | void
 

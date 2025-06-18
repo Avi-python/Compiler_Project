@@ -17,4 +17,6 @@ else, ELSE
 do, DO
 while, WHILE
 const, CONST
+print, PRINT
+printf, PRINTF
 %%

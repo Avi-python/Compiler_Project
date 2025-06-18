@@ -1,0 +1,128 @@
+# Windows Cross-Compilation Makefile using MinGW-w64 with Windows LLVM
+# Usage: make -f Makefile.windows
+
+# Cross-compilation tools
+CC = x86_64-w64-mingw32-gcc
+FLEX = flex
+GPERF = gperf
+WINDRES = x86_64-w64-mingw32-windres
+
+# Directories
+INCLUDE_DIR = ../include
+WINDOWS_LLVM_ROOT = ../tools/windows-llvm
+
+# Windows LLVM configuration (using downloaded Windows binaries)
+WINDOWS_LLVM_INCLUDE = $(WINDOWS_LLVM_ROOT)/include
+WINDOWS_LLVM_LIB = $(WINDOWS_LLVM_ROOT)/lib
+
+# LLVM flags for Windows cross-compilation
+LLVM_CFLAGS = -I$(WINDOWS_LLVM_INCLUDE)
+LLVM_LDFLAGS = -L$(WINDOWS_LLVM_LIB) -lLLVM-C
+
+# Compiler flags
+CFLAGS = -Wall -g -I$(INCLUDE_DIR) $(LLVM_CFLAGS) -DWINDOWS_BUILD
+# Linker flags for Windows with static linking
+LDFLAGS = $(LLVM_LDFLAGS) -static-libgcc -static-libstdc++ -static
+
+# Target executable with .exe extension
+TARGET = compiler.exe
+
+# Source files (same as Linux)
+LEX_L_FILE = scanner.l
+PARSER_FILE = parser.c
+AST_FILE = ast.c
+SYMBOL_FILE = symbol.c
+DRIVER_FILE = driver.c
+HASHTABLE_FILE = hashtable.c
+SYMBOL_TABLE_FILE = symbol_table.c
+CODEGEN_FILE = codegen.c
+SEMANTIC_FILE = semantic.c
+RESWORDS_GPERF_FILE = reswords.gperf
+
+# Generated files
+LEX_C_FILE = lex.yy.c
+RESWORDS_H_FILE = reswords.h
+
+# Header files
+HEADERS = \
+	$(INCLUDE_DIR)/tokens.h \
+	$(INCLUDE_DIR)/ast.h \
+	$(INCLUDE_DIR)/symbol.h \
+	$(INCLUDE_DIR)/symbol_table.h \
+	$(INCLUDE_DIR)/hashtable.h \
+	$(INCLUDE_DIR)/error.h \
+	$(INCLUDE_DIR)/parser.h \
+	$(INCLUDE_DIR)/codegen.h \
+	$(INCLUDE_DIR)/semantic.h
+
+# Object files
+OBJS = \
+	$(SYMBOL_TABLE_FILE:.c=.obj) \
+	$(HASHTABLE_FILE:.c=.obj) \
+	$(DRIVER_FILE:.c=.obj) \
+	$(PARSER_FILE:.c=.obj) \
+	$(AST_FILE:.c=.obj) \
+	$(SYMBOL_FILE:.c=.obj) \
+	$(CODEGEN_FILE:.c=.obj) \
+	$(SEMANTIC_FILE:.c=.obj) \
+	lex.yy.obj
+
+# Default target
+all: check-deps $(TARGET)
+
+# Check dependencies including Windows LLVM
+check-deps:
+	@echo "Checking Windows cross-compilation dependencies..."
+	@which $(CC) > /dev/null || (echo "Error: MinGW-w64 not found. Install with: sudo apt install gcc-mingw-w64" && exit 1)
+	@which $(FLEX) > /dev/null || (echo "Error: Flex not found. Install with: sudo apt install flex" && exit 1)
+	@which $(GPERF) > /dev/null || (echo "Error: Gperf not found. Install with: sudo apt install gperf" && exit 1)
+	@test -d $(WINDOWS_LLVM_ROOT) || (echo "Error: Windows LLVM not found at $(WINDOWS_LLVM_ROOT)" && exit 1)
+	@test -f $(WINDOWS_LLVM_LIB)/LLVM-C.lib || (echo "Error: LLVM-C.lib not found. Please run setup script first." && exit 1)
+	@echo "All dependencies found including Windows LLVM!"
+
+# Rule to link the final executable
+$(TARGET): $(OBJS) $(HEADERS)
+	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LDFLAGS)
+	@echo "Windows executable with full LLVM support created: $(TARGET)"
+	@echo "Testing if executable was created properly..."
+	@file $(TARGET) || echo "File command not available"
+
+# Compilation rules
+%.obj: %.c $(HEADERS)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Specific rules for generated files
+lex.yy.obj: $(LEX_C_FILE) $(HEADERS)
+	$(CC) $(CFLAGS) -c $(LEX_C_FILE) -o $@
+
+# Generate lexer
+$(LEX_C_FILE): $(LEX_L_FILE) $(RESWORDS_H_FILE) $(HEADERS)
+	$(FLEX) -o $@ $(LEX_L_FILE)
+
+# Generate reserved words header
+$(RESWORDS_H_FILE): $(RESWORDS_GPERF_FILE)
+	$(GPERF) -S 1 -C -c -P -t -N is_resword $(RESWORDS_GPERF_FILE) | \
+	sed 's/register const char \*s = resword->name + stringpool;/register const char *s = stringpool + (int)(size_t)resword->name;/' > $(RESWORDS_H_FILE)
+
+# Clean Windows-specific files
+clean:
+	rm -f $(TARGET) $(LEX_C_FILE) $(RESWORDS_H_FILE) *.obj *.exe
+
+# Test the built executable (won't run but will check if it's a valid PE file)
+test: $(TARGET)
+	@echo "Testing Windows executable..."
+	@file $(TARGET)
+	@echo "Size: $$(ls -lh $(TARGET) | awk '{print $$5}')"
+
+# Package for distribution with LLVM DLLs
+package: $(TARGET)
+	@echo "Creating Windows distribution package with LLVM support..."
+	mkdir -p dist/windows
+	cp $(TARGET) dist/windows/
+	cp $(WINDOWS_LLVM_ROOT)/bin/LLVM-C.dll dist/windows/ 2>/dev/null || echo "Warning: LLVM-C.dll not found, may need manual copying"
+	cp ../README.md dist/windows/
+	echo "This Windows build includes full LLVM code generation support." > dist/windows/README_WINDOWS.txt
+	echo "Make sure LLVM-C.dll is in the same directory as the executable." >> dist/windows/README_WINDOWS.txt
+	@echo "Windows package with LLVM support created in dist/windows/"
+
+.PHONY: all clean check-deps test package

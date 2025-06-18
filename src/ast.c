@@ -168,6 +168,33 @@ BinaryExpressionNode* create_binary_expression_node(int op, ASTNode* left, ASTNo
     return node;
 }
 
+PrintStatementNode* create_print_statement_node(ASTNode* expression, int lineno, int colno) {
+    PrintStatementNode* node = (PrintStatementNode*)malloc(sizeof(PrintStatementNode));
+    if (node == NULL) return NULL;
+    
+    node->base.type = NODE_PRINT_STATEMENT;
+    node->base.lineno = lineno;
+    node->base.colno = colno;
+    node->base.next = NULL;
+    node->base.root = NULL;
+    node->expression = expression;
+    return node;
+}
+
+PrintfStatementNode* create_printf_statement_node(ASTNode* format_string, ASTNode* arguments, int lineno, int colno) {
+    PrintfStatementNode* node = (PrintfStatementNode*)malloc(sizeof(PrintfStatementNode));
+    if (node == NULL) return NULL;
+    
+    node->base.type = NODE_PRINTF_STATEMENT;
+    node->base.lineno = lineno;
+    node->base.colno = colno;
+    node->base.next = NULL;
+    node->base.root = NULL;
+    node->format_string = format_string;
+    node->arguments = arguments;
+    return node;
+}
+
 FunctionCallNode* create_function_call_node(ASTNode* identifier, ASTNode* params, int lineno, int colno) {
     FunctionCallNode* node = (FunctionCallNode*)malloc(sizeof(FunctionCallNode));
     if (node == NULL) return NULL;
@@ -205,6 +232,19 @@ NumberNode* create_number_literal_node(int value, int lineno, int colno) {
     node->base.next = NULL;
     node->base.root = NULL;
     node->value = value;
+    return node;
+}
+
+StringLiteralNode* create_string_literal_node(char* value, int lineno, int colno) {
+    StringLiteralNode* node = (StringLiteralNode*)malloc(sizeof(StringLiteralNode));
+    if (node == NULL) return NULL;
+    
+    node->base.type = NODE_STRING_LITERAL;
+    node->base.lineno = lineno;
+    node->base.colno = colno;
+    node->base.next = NULL;
+    node->base.root = NULL;
+    node->value = strdup(value); // Make a copy of the string
     return node;
 }
 
@@ -285,6 +325,13 @@ void free_ast(ASTNode* node) {
             free_ast(((AssignmentStatementNode*)node)->identifier);
             free_ast(((AssignmentStatementNode*)node)->expression);
             break;
+        case NODE_PRINT_STATEMENT:
+            free_ast(((PrintStatementNode*)node)->expression);
+            break;
+        case NODE_PRINTF_STATEMENT:
+            free_ast(((PrintfStatementNode*)node)->format_string);
+            free_ast(((PrintfStatementNode*)node)->arguments);
+            break;
         case NODE_BINARY_EXPRESSION:
             free_ast(((BinaryExpressionNode*)node)->left);
             free_ast(((BinaryExpressionNode*)node)->right);
@@ -295,6 +342,12 @@ void free_ast(ASTNode* node) {
             break;
         case NODE_IDENTIFIER:
         case NODE_NUMBER_LITERAL:
+        case NODE_STRING_LITERAL:
+            // For string literals, we need to free the string value
+            if (node->type == NODE_STRING_LITERAL) {
+                free(((StringLiteralNode*)node)->value);
+            }
+            break;
         case NODE_TYPE:
         case NODE_ERROR:
             // No children to free
@@ -370,6 +423,16 @@ void visualize_ast_recursive(ASTNode* node, FILE* fp) {
             fprintf(fp, "AssignmentStatement");
             break;
         }
+        case NODE_PRINT_STATEMENT: {
+            PrintStatementNode* printNode = (PrintStatementNode*)node;
+            fprintf(fp, "PrintStatement");
+            break;
+        }
+        case NODE_PRINTF_STATEMENT: {
+            PrintfStatementNode* printfNode = (PrintfStatementNode*)node;
+            fprintf(fp, "PrintfStatement");
+            break;
+        }
         case NODE_BINARY_EXPRESSION: {
             BinaryExpressionNode* binOpNode = (BinaryExpressionNode*)node;
             // Assuming you have a way to map op code to string, e.g., a helper function or switch
@@ -389,6 +452,11 @@ void visualize_ast_recursive(ASTNode* node, FILE* fp) {
         case NODE_NUMBER_LITERAL: {
             NumberNode* numNode = (NumberNode*)node;
             fprintf(fp, "Number: %d", numNode->value);
+            break;
+        }
+        case NODE_STRING_LITERAL: {
+            StringLiteralNode* strNode = (StringLiteralNode*)node;
+            fprintf(fp, "String: %s", strNode->value);
             break;
         }
         case NODE_TYPE: {
@@ -541,6 +609,26 @@ void visualize_ast_recursive(ASTNode* node, FILE* fp) {
             }
             break;
         }
+        case NODE_PRINT_STATEMENT: {
+            PrintStatementNode* printNode = (PrintStatementNode*)node;
+            if (printNode->expression) {
+                visualize_ast_recursive(printNode->expression, fp);
+                fprintf(fp, "  node%p -> node%p [label=\"expression\"];\n", (void*)node, (void*)printNode->expression);
+            }
+            break;
+        }
+        case NODE_PRINTF_STATEMENT: {
+            PrintfStatementNode* printfNode = (PrintfStatementNode*)node;
+            if (printfNode->format_string) {
+                visualize_ast_recursive(printfNode->format_string, fp);
+                fprintf(fp, "  node%p -> node%p [label=\"format_string\"];\n", (void*)node, (void*)printfNode->format_string);
+            }
+            if (printfNode->arguments) {
+                visualize_ast_recursive(printfNode->arguments, fp);
+                fprintf(fp, "  node%p -> node%p [label=\"arguments\"];\n", (void*)node, (void*)printfNode->arguments);
+            }
+            break;
+        }
         case NODE_BINARY_EXPRESSION: {
             BinaryExpressionNode* binOpNode = (BinaryExpressionNode*)node;
             if (binOpNode->left) {
@@ -567,6 +655,7 @@ void visualize_ast_recursive(ASTNode* node, FILE* fp) {
         }
         case NODE_IDENTIFIER:    // Leaf node
         case NODE_NUMBER_LITERAL: // Leaf node
+        case NODE_STRING_LITERAL: // Leaf node
         case NODE_TYPE:          // Leaf node
         case NODE_ERROR:         // Leaf node
             break;

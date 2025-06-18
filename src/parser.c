@@ -46,6 +46,8 @@ ASTNode* type();
 ASTNode* if_statement();
 ASTNode* while_statement();
 ASTNode* return_statement();
+ASTNode* print_statement();
+ASTNode* printf_statement();
 
 // --- Main Driver --- (This section will be replaced)
 
@@ -103,6 +105,7 @@ char* token_type_to_string(int token_type)
     switch (token_type) {
         case IDENTIFIER: return "IDENTIFIER";
         case NUMBER: return "NUMBER";
+        case CHAR_LITERAL: return "CHAR_LITERAL";
         case PLUS: return "PLUS";
         case MINUS: return "MINUS";
         case MUL: return "MUL";
@@ -129,6 +132,9 @@ char* token_type_to_string(int token_type)
         case LT: return "LT";
         case GT: return "GT";
         case COMMA: return "COMMA";
+        case PRINT: return "PRINT";
+        case PRINTF: return "PRINTF";
+        case STRING_LITERAL: return "STRING_LITERAL";
         case EOF: return "EOF";
         default: 
             return "UNKNOWN";
@@ -361,8 +367,7 @@ ASTNode* function_definition_body(ASTNode* type_node, Symbol* func_sym)
             func_sym == NULL ? "NULL" : func_sym->name, current_sym_table->depth, (void*)current_sym_table);
 
     sym_t* scope_where_func_is_declared = current_sym_table;
-    sym_t* function_scope = create_symbol_table(); // Scope for parameters and function locals' first level
-    // TODO : error handling
+    sym_t* function_scope = create_symbol_table();
 
     int l = lineno;
     int c = column;
@@ -380,12 +385,12 @@ ASTNode* function_definition_body(ASTNode* type_node, Symbol* func_sym)
 
     if (!match(RPAREN)) 
     {
-        int follow_set[] = {LBRACE, INT, CHAR, VOID, EOF}; // Follow for FuncDef or start of CompoundStmt
+        int follow_set[] = {LBRACE, INT, CHAR, VOID, EOF};
         char error_msg[200];
         sprintf(error_msg, "Expected \')\' after parameter list, got %s", token_type_to_string(token));
         save_error_lexer_pos("syntax error", error_msg);
         error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "function_definition_rparen");
-        // If RPAREN is missing, proceed if recovery finds LBRACE, otherwise error.
+
         if (token != LBRACE) {
             free_all_symbol_tables(function_scope);
             free_ast(type_node); free_sym(func_sym); free_ast(params_list_node);
@@ -523,7 +528,7 @@ ASTNode* compound_statement()
 
     if(!match(LBRACE))
     {
-        int follow_set[] = {EOF, IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE, ELSE, RETURN};
+        int follow_set[] = {EOF, IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE, ELSE, RETURN, PRINT};
         char error_msg[200];
         sprintf(error_msg, "Expected \'{\' to start compound statement, got %s", token_type_to_string(token));
         save_error_lexer_pos("syntax error", error_msg);
@@ -541,7 +546,7 @@ ASTNode* compound_statement()
     
     if(!match(RBRACE))
     {
-        int follow_set[] = {EOF, IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE, ELSE, RETURN};
+        int follow_set[] = {EOF, IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE, ELSE, RETURN, PRINT};
         char error_msg[200];
         sprintf(error_msg, "Expected \'}\' at end of compound statement, got %s",
                 token_type_to_string(token));
@@ -632,7 +637,7 @@ ASTNode* statement()
 {
     fprintf(log_file, "Parsing <Statement> (current token: %s, line: %d)\n", token_type_to_string(token), lineno);
 
-    int stmt_follow_set[] = {IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE, ELSE, RETURN};
+    int stmt_follow_set[] = {IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE, ELSE, RETURN, PRINT, PRINTF};
     int stmt_follow_set_size = sizeof(stmt_follow_set)/sizeof(stmt_follow_set[0]);
     ASTNode* stmt_node = NULL;
 
@@ -664,11 +669,12 @@ ASTNode* statement()
         {
             char error_msg[256];
             sprintf(error_msg, "Identifier '%s' not declared in this scope (or parent scopes).", yylval.sval);
-            save_error_lexer_pos("semantic error", error_msg); // This is a semantic error.
+            save_error_lexer_pos("semantic error", error_msg);
             match(IDENTIFIER);
             int special_follow[] = {SEMI, EOF, RBRACE};
             error_recovery(special_follow, sizeof(special_follow)/sizeof(special_follow[0]), "statement_after_declaration");
-            return (ASTNode*)create_error_node(lineno, column); // TODO : 先直接 return 
+            if(token == SEMI) match(SEMI); // consume
+            return (ASTNode*)create_error_node(lineno, column);
         }
         match(IDENTIFIER);
         stmt_node = assign_or_func_call(id_sym); // id_sym is consumed by assign_or_func_call
@@ -700,6 +706,34 @@ ASTNode* statement()
             sprintf(error_msg, "Expected \';\' after return statement, got %s", token_type_to_string(token));
             save_error_lexer_pos("syntax error", error_msg);
             error_recovery(stmt_follow_set, stmt_follow_set_size, "statement_after_return");
+            free_ast(stmt_node);
+            return (ASTNode*)create_error_node(lineno, column);
+        }
+        return stmt_node;
+    }
+    if(token == PRINT) 
+    {
+        stmt_node = print_statement();
+        if(!match(SEMI)) 
+        {
+            char error_msg[200];
+            sprintf(error_msg, "Expected \';\' after print statement, got %s", token_type_to_string(token));
+            save_error_lexer_pos("syntax error", error_msg);
+            error_recovery(stmt_follow_set, stmt_follow_set_size, "statement_after_print");
+            free_ast(stmt_node);
+            return (ASTNode*)create_error_node(lineno, column);
+        }
+        return stmt_node;
+    }
+    if(token == PRINTF) 
+    {
+        stmt_node = printf_statement();
+        if(!match(SEMI)) 
+        {
+            char error_msg[200];
+            sprintf(error_msg, "Expected \';\' after printf statement, got %s", token_type_to_string(token));
+            save_error_lexer_pos("syntax error", error_msg);
+            error_recovery(stmt_follow_set, stmt_follow_set_size, "statement_after_printf");
             free_ast(stmt_node);
             return (ASTNode*)create_error_node(lineno, column);
         }
@@ -817,8 +851,8 @@ ASTNode* function_call_statement(Symbol* id_sym)
 ASTNode* argument_list_opt() 
 {
     fprintf(log_file, "Parsing <ArgumentListOpt> (current token: %s)\n", token_type_to_string(token));
-    // FIRST of ArgumentList is FIRST of Expression (ID, NUMBER, LPAREN)
-    if (token == IDENTIFIER || token == NUMBER || token == LPAREN) {
+    // FIRST of ArgumentList is FIRST of Expression (ID, NUMBER, CHAR_LITERAL, STRING_LITERAL, LPAREN)
+    if (token == IDENTIFIER || token == NUMBER || token == CHAR_LITERAL || token == STRING_LITERAL || token == LPAREN) {
         return argument_list();
     }
     // Epsilon case
@@ -1112,7 +1146,7 @@ ASTNode* term_prime(ASTNode* left_operand)
     return left_operand; // Epsilon case
 }
 
-// <Factor> ::= <Identifier> <EpsilonOrFuncCall> | <Number> | ( <Expression> )
+// <Factor> ::= <Identifier> <EpsilonOrFuncCall> | <Number> | <CharLiteral> | ( <Expression> )
 ASTNode* factor() 
 {
     fprintf(log_file, "Parsing <Factor>. Current scope: depth %d, addr %p. Token: %s\n",
@@ -1126,7 +1160,8 @@ ASTNode* factor()
         if (!found_sym) {
             char error_msg[256];
             sprintf(error_msg, "Identifier '%s' not declared in this scope (or parent scopes).", yylval.sval);
-            save_error_lexer_pos("semantic error", error_msg); // This is a semantic error.
+            save_error_lexer_pos("semantic error", error_msg);
+            match(IDENTIFIER); // Consume IDENTIFIER token
             return (ASTNode*)create_error_node(lineno, column);
         }
         match(IDENTIFIER);
@@ -1137,6 +1172,18 @@ ASTNode* factor()
         int val = yylval.ival;
         match(NUMBER);
         node = (ASTNode*)create_number_literal_node(val, l, c);
+    } 
+    else if (token == CHAR_LITERAL) 
+    {
+        int char_val = yylval.ival;
+        match(CHAR_LITERAL);
+        node = (ASTNode*)create_number_literal_node(char_val, l, c);
+    } 
+    else if (token == STRING_LITERAL) 
+    {
+        char* str_val = yylval.sval;
+        match(STRING_LITERAL);
+        node = (ASTNode*)create_string_literal_node(str_val, l, c);
     } 
     else if (token == LPAREN) 
     {
@@ -1161,7 +1208,7 @@ ASTNode* factor()
     {
         int follow_set[] = {MUL, DIV, PLUS, MINUS, RPAREN, SEMI, LE, GE, LT, GT, EQ, NE, COMMA, RBRACE, EOF};
         char error_msg[200];
-        sprintf(error_msg, "Unexpected token %s in factor. Expected identifier, number, or \'(\'",
+        sprintf(error_msg, "Unexpected token %s in factor. Expected identifier, number, character literal, or \'(\'",
                 token_type_to_string(token));
         save_error_lexer_pos("syntax error", error_msg);
         error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "factor_unexpected");
@@ -1312,6 +1359,82 @@ ASTNode* return_statement()
     }
 
     return (ASTNode*)create_return_statement_node(expr_node, l, c);
+}
+
+ASTNode* print_statement() 
+{
+    fprintf(log_file, "Parsing <PrintStatement> (current token: %s)\n", token_type_to_string(token));
+    int l = lineno;
+    int c = column;
+    match(PRINT);
+
+    if(!match(LPAREN)) 
+    {
+        int follow_set[] = {SEMI, RBRACE}; 
+        char error_msg[200];
+        sprintf(error_msg, "Expected \'(\' after \'print\', got %s", token_type_to_string(token));
+        save_error_lexer_pos("syntax error", error_msg);
+        error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "print_statement_missing_lparen");
+        return (ASTNode*)create_error_node(lineno, column);
+    }
+    
+    ASTNode* expr_node = expression();
+
+    if(!match(RPAREN)) 
+    {
+        int follow_set[] = {SEMI}; 
+        char error_msg[200];
+        sprintf(error_msg, "Expected \')\' after \'print\' expression, got %s", token_type_to_string(token));
+        save_error_lexer_pos("syntax error", error_msg);
+        error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "print_statement_missing_rparen");
+        if (token != SEMI) { free_ast(expr_node); return (ASTNode*)create_error_node(lineno, column); }
+    }
+
+    return (ASTNode*)create_print_statement_node(expr_node, l, c);
+}
+
+ASTNode* printf_statement() 
+{
+    fprintf(log_file, "Parsing <PrintfStatement> (current token: %s)\n", token_type_to_string(token));
+    int l = lineno;
+    int c = column;
+    match(PRINTF);
+
+    if(!match(LPAREN)) 
+    {
+        int follow_set[] = {SEMI, RBRACE}; 
+        char error_msg[200];
+        sprintf(error_msg, "Expected \'(\' after \'printf\', got %s", token_type_to_string(token));
+        save_error_lexer_pos("syntax error", error_msg);
+        error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "printf_statement_missing_lparen");
+        return (ASTNode*)create_error_node(lineno, column);
+    }
+    
+    // Parse format string (should be a string literal or expression)
+    ASTNode* format_string_node = expression();
+    
+    // Parse optional arguments
+    ASTNode* args_node = NULL;
+    if (token == COMMA) {
+        match(COMMA);
+        args_node = argument_list();
+    }
+
+    if(!match(RPAREN)) 
+    {
+        int follow_set[] = {SEMI}; 
+        char error_msg[200];
+        sprintf(error_msg, "Expected \')\' after \'printf\' arguments, got %s", token_type_to_string(token));
+        save_error_lexer_pos("syntax error", error_msg);
+        error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "printf_statement_missing_rparen");
+        if (token != SEMI) { 
+            free_ast(format_string_node); 
+            free_ast(args_node); 
+            return (ASTNode*)create_error_node(lineno, column); 
+        }
+    }
+
+    return (ASTNode*)create_printf_statement_node(format_string_node, args_node, l, c);
 }
 
 // --- Main Driver ---

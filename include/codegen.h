@@ -20,6 +20,9 @@ void codegen_dispose();
 // Function to transform LLVM IR to object file
 void codegen_to_object();
 
+// Function to transform LLVM IR to assembly file
+void codegen_to_assembly();
+
 // Function to print the generated LLVM IR to a file
 void codegen_print_ir();
 

@@ -28,7 +28,9 @@ ws          [ \t]+
 dig         [0-9]
 number      {dig}+
 identifier  {alpha}({alpha}|{dig}|_)*
-character   \'([^'])\'
+character   \'([^'\\]|\\.)\'
+string      \"([^"\\]|\\.)*\"
+invalid_char_literal \'([^'\\]|\\.)([^'\\]|\\.)+\'
 
 %%
 
@@ -76,9 +78,49 @@ character   \'([^'])\'
     return IDENTIFIER; 
 } 
 
-{number}        { yylval.ival = atoi(yytext); column += yyleng; return NUMBER; } // Assuming yylval.ival is int
-{character}     { yylval.sval = strdup(yytext); column += yyleng; return CHAR; } // Assuming yylval.sval is char* for the literal string
-.               { save_error_lexer_pos("unexpected character", yytext); column += yyleng; }
+{number}        { yylval.ival = atoi(yytext); column += yyleng; return NUMBER; }
+{character}     { 
+    column += yyleng; 
+    // Extract the character value from the literal (skip quotes)
+    if (yytext[1] == '\\') {
+        // Handle escape sequences
+        switch(yytext[2]) {
+            case 'n': yylval.ival = '\n'; break;
+            case 't': yylval.ival = '\t'; break;
+            case 'r': yylval.ival = '\r'; break;
+            case 'b': yylval.ival = '\b'; break;
+            case 'f': yylval.ival = '\f'; break;
+            case 'v': yylval.ival = '\v'; break;
+            case 'a': yylval.ival = '\a'; break;
+            case '\\': yylval.ival = '\\'; break;
+            case '\'': yylval.ival = '\''; break;
+            case '\"': yylval.ival = '\"'; break;
+            case '0': yylval.ival = '\0'; break;
+            default: yylval.ival = yytext[2]; break;
+        }
+    } else {
+        yylval.ival = yytext[1]; // Regular character between quotes
+    }
+    return CHAR_LITERAL; 
+}
+{invalid_char_literal} { 
+    char error_msg[256];
+    sprintf(error_msg, "invalid character literal: %s", yytext);
+    save_error_lexer_pos("lexical error", error_msg); column += yyleng; 
+    yylval.ival = '\0';
+    return CHAR_LITERAL; // Return null character to avoid further processing
+}
+{string}         { 
+    yylval.sval = strdup(yytext); 
+    column += yyleng; 
+    return STRING_LITERAL; 
+}
+
+.               { 
+    char error_msg[256];
+    sprintf(error_msg, "unexpected character: %s", yytext);
+    save_error_lexer_pos("lexical error", error_msg); column += yyleng; 
+}
 
 %%
 

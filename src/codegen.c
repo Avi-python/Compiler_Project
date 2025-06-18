@@ -162,6 +162,43 @@ static LLVMValueRef generate_statement(ASTNode* stmt_node);
 static LLVMValueRef generate_node(ASTNode* node);
 static int current_block_needs_terminator();
 
+// Helper function to convert argument types for function calls
+static LLVMValueRef convert_argument_type(LLVMValueRef arg_value, LLVMTypeRef target_type, const char* arg_name) 
+{
+    if (!arg_value || !target_type) return arg_value;
+    
+    LLVMTypeRef arg_type = LLVMTypeOf(arg_value);
+    
+    // If types match exactly, no conversion needed
+    if (LLVMGetTypeKind(arg_type) == LLVMGetTypeKind(target_type) &&
+        LLVMGetIntTypeWidth(arg_type) == LLVMGetIntTypeWidth(target_type)) {
+        return arg_value;
+    }
+    
+    // Handle integer type conversions
+    if (LLVMGetTypeKind(arg_type) == LLVMIntegerTypeKind && 
+        LLVMGetTypeKind(target_type) == LLVMIntegerTypeKind) {
+        
+        unsigned arg_width = LLVMGetIntTypeWidth(arg_type);
+        unsigned target_width = LLVMGetIntTypeWidth(target_type);
+        
+        if (arg_width > target_width) {
+            // Truncate (e.g., i32 -> i8 for char parameters)
+            printf("CodeGen Debug: Truncating argument '%s' from i%u to i%u\n", 
+                   arg_name ? arg_name : "unknown", arg_width, target_width);
+            return LLVMBuildTrunc(llvm_builder, arg_value, target_type, "arg_trunc");
+        } 
+        else if (arg_width < target_width) {
+            // Sign extend (e.g., i8 -> i32)
+            printf("CodeGen Debug: Sign-extending argument '%s' from i%u to i%u\n", 
+                   arg_name ? arg_name : "unknown", arg_width, target_width);
+            return LLVMBuildSExt(llvm_builder, arg_value, target_type, "arg_sext");
+        }
+    }
+    
+    // If no conversion is possible or needed, return original value
+    return arg_value;
+}
 
 void codegen_init(const char* output_filename) 
 {
@@ -219,24 +256,23 @@ int codegen_generate(ASTNode* ast_root, sym_t* global_symbol_table)
 
 void codegen_to_object()
 {
+    // Initialize all common target architectures for better cross-platform support
     LLVMInitializeX86TargetInfo();
     LLVMInitializeX86Target();
     LLVMInitializeX86TargetMC();
     LLVMInitializeX86AsmPrinter();
     LLVMInitializeX86AsmParser();
 
-
-    // 步驟 2: 獲取目標資訊並建立 TargetMachine
-    char* targetTriple = LLVMGetDefaultTargetTriple(); // 獲取本機的目標三元組
+    char* targetTriple = LLVMGetDefaultTargetTriple();
     LLVMTargetRef target;
     char* error = NULL;
 
-    // 根據三元組尋找目標
-    if (LLVMGetTargetFromTriple(targetTriple, &target, &error)) {
+    if (LLVMGetTargetFromTriple(targetTriple, &target, &error)) 
+    {
         fprintf(stderr, "Failed to get target from triple: %s\n", error);
         LLVMDisposeMessage(error);
         LLVMDisposeMessage(targetTriple);
-        return 1;
+        return;
     }
 
     const char* cpu = "generic";
@@ -247,7 +283,7 @@ void codegen_to_object()
         cpu,
         features,
         LLVMCodeGenLevelDefault,
-        LLVMRelocDefault,
+        LLVMRelocPIC,
         LLVMCodeModelDefault
     );
 
@@ -261,7 +297,6 @@ void codegen_to_object()
 
     char* errorMessage = NULL;
 
-    // Step 3: Emit the object file
     if (LLVMTargetMachineEmitToFile(machine, llvm_module, (char*)filename, LLVMObjectFile, &errorMessage)) 
     {
         fprintf(stderr, "Failed to emit object file: %s\n", errorMessage);
@@ -273,7 +308,56 @@ void codegen_to_object()
 
     printf("Successfully compiled module to %s\n", filename);
 
-    // Step 4: Clean up resources
+    LLVMDisposeTargetMachine(machine);
+    LLVMDisposeMessage(targetTriple);
+}
+
+void codegen_to_assembly()
+{
+    LLVMInitializeX86TargetInfo();
+    LLVMInitializeX86Target();
+    LLVMInitializeX86TargetMC();
+    LLVMInitializeX86AsmPrinter();
+    LLVMInitializeX86AsmParser();
+
+    char* targetTriple = LLVMGetDefaultTargetTriple();
+    LLVMTargetRef target;
+    char* error = NULL;
+
+    if (LLVMGetTargetFromTriple(targetTriple, &target, &error)) {
+        fprintf(stderr, "Failed to get target from triple: %s\n", error);
+        LLVMDisposeMessage(error);
+        LLVMDisposeMessage(targetTriple);
+        return;
+    }
+
+    const char* cpu = "generic";
+    const char* features = "";
+    LLVMTargetMachineRef machine = LLVMCreateTargetMachine(
+        target,
+        targetTriple,
+        cpu,
+        features,
+        LLVMCodeGenLevelDefault,
+        LLVMRelocPIC,
+        LLVMCodeModelDefault
+    );
+
+    const char* filename = "output.s";
+
+    char* errorMessage = NULL;
+
+    if (LLVMTargetMachineEmitToFile(machine, llvm_module, (char*)filename, LLVMAssemblyFile, &errorMessage)) 
+    {
+        fprintf(stderr, "Failed to emit assembly file: %s\n", errorMessage);
+        LLVMDisposeMessage(errorMessage);
+        LLVMDisposeTargetMachine(machine);
+        LLVMDisposeMessage(targetTriple);
+        return;
+    }
+
+    printf("Successfully compiled module to assembly: %s\n", filename);
+
     LLVMDisposeTargetMachine(machine);
     LLVMDisposeMessage(targetTriple);
 }
@@ -512,10 +596,207 @@ static LLVMValueRef generate_node(ASTNode* node)
             }
             return NULL; // Return is a control flow instruction
         }
+        case NODE_PRINT_STATEMENT:
+        {
+            PrintStatementNode* print_node = (PrintStatementNode*)node;
+            if (print_node->expression) 
+            {
+                LLVMValueRef expr_val = generate_expression(print_node->expression);
+                if (expr_val) 
+                {
+                    // Call printf to print the value
+                    // First, get or declare printf function
+                    LLVMValueRef printf_func = LLVMGetNamedFunction(llvm_module, "printf");
+                    if (!printf_func) 
+                    {
+                        // Declare printf function: int printf(char* format, ...)
+                        LLVMTypeRef printf_type = LLVMFunctionType(
+                            LLVMInt32TypeInContext(llvm_context), // return type: int
+                            (LLVMTypeRef[]){LLVMPointerType(LLVMInt8TypeInContext(llvm_context), 0)}, // char*
+                            1, // number of fixed parameters 
+                            1  // is variadic
+                        );
+                        printf_func = LLVMAddFunction(llvm_module, "printf", printf_type);
+                    }
+                    
+                    // Determine format string based on expression type
+                    LLVMValueRef format_str;
+                    LLVMTypeRef expr_type = LLVMTypeOf(expr_val);
+                    
+                    if (LLVMGetTypeKind(expr_type) == LLVMIntegerTypeKind && LLVMGetIntTypeWidth(expr_type) == 8) 
+                    {
+                        // It's a char (8-bit integer) - use %c format
+                        LLVMValueRef char_fmt_global = LLVMGetNamedGlobal(llvm_module, "printf_char_fmt");
+                        if (!char_fmt_global) {
+                            LLVMValueRef fmt_string = LLVMConstStringInContext(llvm_context, "%c", 2, 0);
+                            char_fmt_global = LLVMAddGlobal(llvm_module, LLVMTypeOf(fmt_string), "printf_char_fmt");
+                            LLVMSetInitializer(char_fmt_global, fmt_string);
+                            LLVMSetLinkage(char_fmt_global, LLVMPrivateLinkage);
+                            LLVMSetGlobalConstant(char_fmt_global, 1);
+                        }
+                        format_str = LLVMBuildBitCast(llvm_builder, char_fmt_global, 
+                                                    LLVMPointerType(LLVMInt8TypeInContext(llvm_context), 0), "char_fmt_ptr");
+                        
+                        // Extend char to int for printf (chars are promoted to int in variadic functions)
+                        expr_val = LLVMBuildSExt(llvm_builder, expr_val, LLVMInt32TypeInContext(llvm_context), "char_to_int");
+                    }
+                    else 
+                    {
+                        // Use %d format for integers
+                        LLVMValueRef int_fmt_global = LLVMGetNamedGlobal(llvm_module, "printf_int_fmt");
+                        if (!int_fmt_global) {
+                            LLVMValueRef fmt_string = LLVMConstStringInContext(llvm_context, "%d", 2, 0);
+                            int_fmt_global = LLVMAddGlobal(llvm_module, LLVMTypeOf(fmt_string), "printf_int_fmt");
+                            LLVMSetInitializer(int_fmt_global, fmt_string);
+                            LLVMSetLinkage(int_fmt_global, LLVMPrivateLinkage);
+                            LLVMSetGlobalConstant(int_fmt_global, 1);
+                        }
+                        format_str = LLVMBuildBitCast(llvm_builder, int_fmt_global, 
+                                                    LLVMPointerType(LLVMInt8TypeInContext(llvm_context), 0), "int_fmt_ptr");
+                    }
+                    
+                    // Call printf with format string and value
+                    LLVMValueRef printf_args[] = {format_str, expr_val};
+                    LLVMBuildCall2(llvm_builder, LLVMGlobalGetValueType(printf_func), printf_func, printf_args, 2, "");
+                }
+            }
+            return NULL;
+        }
+        case NODE_PRINTF_STATEMENT:
+        {
+            PrintfStatementNode* printf_node = (PrintfStatementNode*)node;
+            
+            // Get or declare printf function
+            LLVMValueRef printf_func = LLVMGetNamedFunction(llvm_module, "printf");
+            if (!printf_func) 
+            {
+                // Declare printf function: int printf(char* format, ...)
+                LLVMTypeRef printf_type = LLVMFunctionType(
+                    LLVMInt32TypeInContext(llvm_context), // return type: int
+                    (LLVMTypeRef[]){LLVMPointerType(LLVMInt8TypeInContext(llvm_context), 0)}, // char*
+                    1, // number of fixed parameters 
+                    1  // is variadic
+                );
+                printf_func = LLVMAddFunction(llvm_module, "printf", printf_type);
+            }
+            
+            // Generate format string
+            LLVMValueRef format_val = generate_expression(printf_node->format_string);
+            if (!format_val) {
+                fprintf(stderr, "CodeGen Error: Failed to generate format string for printf\n");
+                return NULL;
+            }
+            
+            // Count arguments
+            int arg_count = 1; // Start with format string
+            ASTNode* current_arg = printf_node->arguments;
+            while (current_arg) {
+                arg_count++;
+                current_arg = current_arg->next;
+            }
+            
+            // Build argument array
+            LLVMValueRef* args = malloc(sizeof(LLVMValueRef) * arg_count);
+            args[0] = format_val; // Format string is first argument
+            
+            // Generate arguments and handle type promotions for variadic function
+            current_arg = printf_node->arguments;
+            for (int i = 1; i < arg_count; i++) {
+                LLVMValueRef arg_val = generate_expression(current_arg);
+                if (!arg_val) {
+                    fprintf(stderr, "CodeGen Error: Failed to generate argument %d for printf\n", i);
+                    free(args);
+                    return NULL;
+                }
+                
+                // Handle variadic function argument promotions
+                LLVMTypeRef arg_type = LLVMTypeOf(arg_val);
+                
+                // Promote char (i8) to int (i32) for variadic functions
+                if (LLVMGetTypeKind(arg_type) == LLVMIntegerTypeKind && LLVMGetIntTypeWidth(arg_type) == 8) {
+                    args[i] = LLVMBuildSExt(llvm_builder, arg_val, LLVMInt32TypeInContext(llvm_context), "char_to_int");
+                    printf("CodeGen Debug: Promoted char argument %d to int for printf\n", i);
+                } else {
+                    args[i] = arg_val;
+                }
+                
+                current_arg = current_arg->next;
+            }
+            
+            // Generate the printf call
+            LLVMBuildCall2(llvm_builder, LLVMGlobalGetValueType(printf_func), 
+                           printf_func, args, arg_count, "printf_result");
+            
+            free(args);
+            return NULL;
+        }
         case NODE_NUMBER_LITERAL: 
         {
             NumberNode* num_node = (NumberNode*)node;
             return LLVMConstInt(LLVMInt32TypeInContext(llvm_context), num_node->value, 0); // 0 for not sign-extended
+        }
+        case NODE_STRING_LITERAL:
+        {
+            StringLiteralNode* str_node = (StringLiteralNode*)node;
+            
+            // Remove quotes from the string literal and handle escape sequences
+            char* str_value = str_node->value;
+            int len = strlen(str_value);
+            
+            // Remove surrounding quotes if present
+            if (len >= 2 && str_value[0] == '"' && str_value[len-1] == '"') {
+                str_value = strndup(str_value + 1, len - 2);
+            } else {
+                str_value = strdup(str_value);
+            }
+            
+            // Process escape sequences
+            char* processed_str = malloc(strlen(str_value) + 1);
+            int j = 0;
+            for (int i = 0; str_value[i]; i++) {
+                if (str_value[i] == '\\' && str_value[i+1]) {
+                    switch (str_value[i+1]) {
+                        case 'n': processed_str[j++] = '\n'; i++; break;
+                        case 't': processed_str[j++] = '\t'; i++; break;
+                        case 'r': processed_str[j++] = '\r'; i++; break;
+                        case 'b': processed_str[j++] = '\b'; i++; break;
+                        case 'f': processed_str[j++] = '\f'; i++; break;
+                        case 'v': processed_str[j++] = '\v'; i++; break;
+                        case 'a': processed_str[j++] = '\a'; i++; break;
+                        case '\\': processed_str[j++] = '\\'; i++; break;
+                        case '\'': processed_str[j++] = '\''; i++; break;
+                        case '\"': processed_str[j++] = '\"'; i++; break;
+                        case '0': processed_str[j++] = '\0'; i++; break;
+                        default: 
+                            processed_str[j++] = str_value[i]; // Keep the backslash if unknown escape
+                            break;
+                    }
+                } else {
+                    processed_str[j++] = str_value[i];
+                }
+            }
+            processed_str[j] = '\0';
+            
+            // Create a unique global string constant
+            static int string_counter = 0;
+            char global_name[64];
+            snprintf(global_name, sizeof(global_name), ".str.%d", string_counter++);
+            
+            // Create LLVM string constant
+            LLVMValueRef str_constant = LLVMConstStringInContext(llvm_context, processed_str, j, 0);
+            LLVMValueRef global_str = LLVMAddGlobal(llvm_module, LLVMTypeOf(str_constant), global_name);
+            LLVMSetInitializer(global_str, str_constant);
+            LLVMSetLinkage(global_str, LLVMPrivateLinkage);
+            LLVMSetGlobalConstant(global_str, 1);
+            
+            // Return a pointer to the first character of the string
+            LLVMValueRef result = LLVMBuildBitCast(llvm_builder, global_str, 
+                                                 LLVMPointerType(LLVMInt8TypeInContext(llvm_context), 0), 
+                                                 "str_ptr");
+            
+            free(str_value);
+            free(processed_str);
+            return result;
         }
         case NODE_LOCAL_VARIABLE_DECLARATION: 
         {
@@ -535,7 +816,31 @@ static LLVMValueRef generate_node(ASTNode* node)
                 if (decl_node->expression) 
                 {
                     LLVMValueRef init_val = generate_expression(decl_node->expression);
-                    if (init_val) LLVMBuildStore(llvm_builder, init_val, var_alloca);
+                    if (init_val) {
+                        LLVMTypeRef init_type = LLVMTypeOf(init_val);
+                        LLVMTypeRef target_type = llvm_type;
+                        
+                        // If types don't match, perform appropriate conversion
+                        if (LLVMGetTypeKind(init_type) == LLVMIntegerTypeKind && 
+                            LLVMGetTypeKind(target_type) == LLVMIntegerTypeKind) {
+                            
+                            unsigned init_width = LLVMGetIntTypeWidth(init_type);
+                            unsigned target_width = LLVMGetIntTypeWidth(target_type);
+                            
+                            if (init_width > target_width) 
+                            {
+                                // Truncate larger integer to smaller (e.g., i32 -> i8)
+                                init_val = LLVMBuildTrunc(llvm_builder, init_val, target_type, "trunc");
+                            } 
+                            else if (init_width < target_width) 
+                            {
+                                // Extend smaller integer to larger (e.g., i8 -> i32)
+                                init_val = LLVMBuildSExt(llvm_builder, init_val, target_type, "sext");
+                            }
+                        }
+                        
+                        LLVMBuildStore(llvm_builder, init_val, var_alloca);
+                    }
                 }
                 current_declarator_ast = current_declarator_ast->next;
             }
@@ -547,16 +852,15 @@ static LLVMValueRef generate_node(ASTNode* node)
             LLVMValueRef var_ref = get_scoped_variable(id_node->symbol->name);
             if (var_ref && LLVMGetInstructionOpcode(var_ref) == LLVMAlloca) 
             {
-                // Local variable - load from alloca (LLVM-14 compatible)
-                LLVMTypeRef alloca_type = get_alloca_type(var_ref);
-                return LLVMBuildLoad(llvm_builder, var_ref, id_node->symbol->name);
+                // Local variable - load from alloca
+                return LLVMBuildLoad2(llvm_builder, LLVMGetAllocatedType(var_ref), var_ref, id_node->symbol->name);
             } 
 
-            // Global variable - load from global (LLVM-14 compatible)
-            LLVMValueRef global_var = LLVMGetNamedGlobal(llvm_module, id_node->symbol->name);
-            if (global_var) 
+            // Global variable - load from global
+            LLVMTypeRef global_type = LLVMGetElementType(LLVMGetNamedGlobal(llvm_module, id_node->symbol->name));
+            if(global_type) 
             {
-                return LLVMBuildLoad(llvm_builder, global_var, id_node->symbol->name);
+                return LLVMBuildLoad2(llvm_builder, global_type, LLVMGetNamedGlobal(llvm_module, id_node->symbol->name), id_node->symbol->name);
             }
 
             fprintf(stderr, "CodeGen Error: Identifier %s not found or not loadable.\n", id_node->symbol->name);
@@ -575,7 +879,22 @@ static LLVMValueRef generate_node(ASTNode* node)
             }
 
             LLVMValueRef expr_val = generate_expression(assign_node->expression);
-            if (expr_val) LLVMBuildStore(llvm_builder, expr_val, var_ref);
+            if (expr_val) {
+                // Get the target variable's type for proper conversion
+                LLVMTypeRef target_type;
+                if (LLVMGetInstructionOpcode(var_ref) == LLVMAlloca) {
+                    // Local variable - get allocated type
+                    target_type = LLVMGetAllocatedType(var_ref);
+                } else {
+                    // Global variable - get element type
+                    target_type = LLVMGetElementType(LLVMTypeOf(var_ref));
+                }
+                
+                // Convert expression value to match target type if needed
+                expr_val = convert_argument_type(expr_val, target_type, id_node->symbol->name);
+                
+                LLVMBuildStore(llvm_builder, expr_val, var_ref);
+            }
             return expr_val; // Assignment can be an expression in C
         }
         case NODE_BINARY_EXPRESSION: 
@@ -706,21 +1025,60 @@ static LLVMValueRef generate_node(ASTNode* node)
                 arg_ast_count = arg_ast_count->next; // Assuming params are a linked list of expression nodes
             }
 
+            // Get function type and parameter types
+            LLVMTypeRef func_type = LLVMGlobalGetValueType(func_to_call);
+            LLVMTypeRef func_return_type = LLVMGetReturnType(func_type);
+            
+            // Check parameter count
+
+            unsigned expected_param_count = LLVMCountParamTypes(func_type);
+            if (arg_count != expected_param_count) {
+                fprintf(stderr, "CodeGen Error: Function %s expects %u parameters, but %d arguments provided\n", 
+                        func_name_node->symbol->name, expected_param_count, arg_count);
+                return NULL;
+            }
+
+            // Get the actual parameter types from the function signature
+            LLVMTypeRef* param_types = NULL;
+            if (arg_count > 0) {
+                param_types = malloc(sizeof(LLVMTypeRef) * arg_count);
+                LLVMGetParamTypes(func_type, param_types);
+            }
+
+            // Generate argument expressions and convert types as needed
             LLVMValueRef* args = malloc(sizeof(LLVMValueRef) * arg_count);
             ASTNode* current_arg_ast = call_node->params;
             for (int i = 0; i < arg_count; ++i) 
             {
-                args[i] = generate_expression(current_arg_ast); // Each param is an expression
-                if (!args[i]) {
+                LLVMValueRef arg_val = generate_expression(current_arg_ast);
+                if (!arg_val) {
                     free(args);
+                    if (param_types) free(param_types);
                     return NULL; // Error in argument generation
                 }
+                
+                // Convert argument type to match parameter type
+                if (param_types) {
+                    char param_name[64];
+                    snprintf(param_name, sizeof(param_name), "arg%d", i);
+                    args[i] = convert_argument_type(arg_val, param_types[i], param_name);
+                    
+                    // Debug: Print type conversion info
+                    LLVMTypeRef arg_type = LLVMTypeOf(arg_val);
+                    LLVMTypeRef param_type = param_types[i];
+                    if (LLVMGetTypeKind(arg_type) == LLVMIntegerTypeKind && 
+                        LLVMGetTypeKind(param_type) == LLVMIntegerTypeKind) {
+                        unsigned arg_width = LLVMGetIntTypeWidth(arg_type);
+                        unsigned param_width = LLVMGetIntTypeWidth(param_type);
+                        printf("CodeGen Debug: Function %s param %d: converting i%u to i%u\n", 
+                               func_name_node->symbol->name, i, arg_width, param_width);
+                    }
+                } else {
+                    args[i] = arg_val;
+                }
+                
                 current_arg_ast = current_arg_ast->next;
             }
-
-            // LLVM-14 compatible function call
-            LLVMTypeRef func_type = get_function_type(func_to_call);
-            LLVMTypeRef func_return_type = LLVMGetReturnType(func_type); // Get function's declared return type
 
             const char *call_name = "";
             if (LLVMGetTypeKind(func_return_type) != LLVMVoidTypeKind) 
@@ -728,9 +1086,11 @@ static LLVMValueRef generate_node(ASTNode* node)
                  call_name = "calltmp"; // Name the result if it's not void
             }
 
-            // Use LLVMBuildCall instead of LLVMBuildCall2 for LLVM-14 compatibility
-            LLVMValueRef call_val = LLVMBuildCall(llvm_builder, func_to_call, args, arg_count, call_name);
+            LLVMValueRef call_val = LLVMBuildCall2(llvm_builder, func_type, func_to_call, args, arg_count, call_name);
+
+            // Clean up allocated memory
             free(args);
+            if (param_types) free(param_types);
             return call_val;
         }
         case NODE_GLOBAL_VARIABLE_DECLARATION: 
@@ -761,7 +1121,7 @@ static LLVMValueRef generate_node(ASTNode* node)
                     }
                     else
                     {
-                        fprintf(stderr, "CodeGen Warning: Global variable %s initializer is not a constant literal. Not supported in this simplified version.\\n", var_name_node->symbol->name);
+                        fprintf(stderr, "CodeGen Warning: Global variable %s initializer is not a constant literal. Not supported in this simplified version.\n", var_name_node->symbol->name);
                         LLVMSetInitializer(global_var, LLVMConstNull(llvm_type)); // Default to zero/null
                     }
                 } 

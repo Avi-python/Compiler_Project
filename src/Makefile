@@ -6,8 +6,7 @@ GPERF = gperf
 # Directories
 INCLUDE_DIR = ../include
 
-# LLVM configuration - Use LLVM-14 specifically
-LLVM_CONFIG = llvm-config-14
+LLVM_CONFIG = llvm-config
 LLVM_CFLAGS = $(shell $(LLVM_CONFIG) --cflags)
 LLVM_LDFLAGS = $(shell $(LLVM_CONFIG) --ldflags --libs core)
 
@@ -28,6 +27,7 @@ DRIVER_FILE = driver.c
 HASHTABLE_FILE = hashtable.c
 SYMBOL_TABLE_FILE = symbol_table.c
 CODEGEN_FILE = codegen.c
+SEMANTIC_FILE = semantic.c
 RESWORDS_GPERF_FILE = reswords.gperf
 
 # Generated C file from Flex
@@ -42,7 +42,8 @@ HEADERS = \
 	$(INCLUDE_DIR)/hashtable.h \
 	$(INCLUDE_DIR)/error.h \
 	$(INCLUDE_DIR)/parser.h \
-	$(INCLUDE_DIR)/codegen.h
+	$(INCLUDE_DIR)/codegen.h \
+	$(INCLUDE_DIR)/semantic.h
 
 RESWORDS_H_FILE = reswords.h
 
@@ -55,6 +56,7 @@ OBJS = \
 	$(AST_FILE:.c=.o) \
 	$(SYMBOL_FILE:.c=.o) \
 	$(CODEGEN_FILE:.c=.o) \
+	$(SEMANTIC_FILE:.c=.o) \
 	lex.yy.o
 
 # Default target: build the executable
@@ -79,6 +81,10 @@ $(HASHTABLE_FILE:.c=.o): $(HASHTABLE_FILE) $(HEADERS)
 # Rule to compile symbol_table.c
 $(SYMBOL_TABLE_FILE:.c=.o): $(SYMBOL_TABLE_FILE) $(HEADERS)
 	$(CC) $(CFLAGS) -c $(SYMBOL_TABLE_FILE)
+
+# Rule to compile semantic.c
+$(SEMANTIC_FILE:.c=.o): $(SEMANTIC_FILE) $(HEADERS)
+	$(CC) $(CFLAGS) -c $(SEMANTIC_FILE)
 
 # Rule to compile ast.c
 $(AST_FILE:.c=.o): $(AST_FILE) $(HEADERS)
