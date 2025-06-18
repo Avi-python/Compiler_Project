@@ -1,6 +1,6 @@
 # C-Like Language Compiler Project
 
-This project is a compiler for a C-like language, developed as a college final homework assignment. It features a complete lexical analyzer (scanner), recursive descent parser, Abstract Syntax Tree (AST) construction, and symbol table management.
+This project is a complete compiler implementation for a C-like language, featuring all major compilation phases from lexical analysis to code generation. Built as a comprehensive compiler construction project, it demonstrates modern compiler design principles with modular architecture and robust error handling throughout the compilation pipeline.
 
 ## Components
 
@@ -124,8 +124,8 @@ The compiler supports a C-like language with the following features:
 - ✅ **Syntax Analysis**: Recursive descent parser with error recovery
 - ✅ **AST Construction**: Full AST generation with visualization support
 - ✅ **Symbol Table**: Hash table-based symbol management
-- 🚧 **Semantic Analysis**: Planned for future development
-- 🚧 **Code Generation**: Planned for future development
+- ✅ **Semantic Analysis**: Complete with type checking and scope resolution
+- ✅ **Code Generation**: Generates assembly code for the supported language constructs
 
 ## Testing
 

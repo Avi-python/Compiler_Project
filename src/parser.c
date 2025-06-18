@@ -528,7 +528,7 @@ ASTNode* compound_statement()
 
     if(!match(LBRACE))
     {
-        int follow_set[] = {EOF, IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE, ELSE, RETURN, PRINT};
+        int follow_set[] = {EOF, IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE, ELSE, RETURN, PRINT, PRINTF};
         char error_msg[200];
         sprintf(error_msg, "Expected \'{\' to start compound statement, got %s", token_type_to_string(token));
         save_error_lexer_pos("syntax error", error_msg);
@@ -546,7 +546,7 @@ ASTNode* compound_statement()
     
     if(!match(RBRACE))
     {
-        int follow_set[] = {EOF, IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE, ELSE, RETURN, PRINT};
+        int follow_set[] = {EOF, IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE, ELSE, RETURN, PRINT, PRINTF};
         char error_msg[200];
         sprintf(error_msg, "Expected \'}\' at end of compound statement, got %s",
                 token_type_to_string(token));

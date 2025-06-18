@@ -25,6 +25,7 @@
                 | <WhileStatement>
                 | <ReturnStatement> ;
                 | <PrintStatement> ;
+                | <PrintfStatement> ;
                 | epsilon
 
 <AssignOrFuncCall> ::= <AssignmentStatement> | <FunctionCallStatement>
@@ -74,6 +75,8 @@
 <ReturnStatement> ::= return [ <Expression> ]
 
 <PrintStatement> ::= print ( <ArgumentListOpt> )
+
+<PrintfStatement> ::= printf ( <Expression> [ , <ArgumentList> ] )
 
 <Identifier> ::= <Alpha> { <Alpha> | <Digit> }
 

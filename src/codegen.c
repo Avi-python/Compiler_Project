@@ -743,13 +743,6 @@ static LLVMValueRef generate_node(ASTNode* node)
             char* str_value = str_node->value;
             int len = strlen(str_value);
             
-            // Remove surrounding quotes if present
-            if (len >= 2 && str_value[0] == '"' && str_value[len-1] == '"') {
-                str_value = strndup(str_value + 1, len - 2);
-            } else {
-                str_value = strdup(str_value);
-            }
-            
             // Process escape sequences
             char* processed_str = malloc(strlen(str_value) + 1);
             int j = 0;

@@ -65,6 +65,7 @@
 	- return
 	- } 
 	- print
+	- printf
 	- else
 
 `<StatementList>`
@@ -75,7 +76,8 @@
 	- if (from `<IfStatement>`)
 	- while (from `<WhileStatement>`)
 	- return (from `<ReturnStatement>`)
-	- print (from `<PrintStatement>`) 
+	- print (from `<PrintStatement>`)
+	- printf (from `<PrintfStatement>`)
 	- epsilon
 - Follow set
 	- }
@@ -89,6 +91,7 @@
 	- while (from `<WhileStatement>`)
 	- return (from `<ReturnStatement>`)
 	- print (from `<PrintStatement>`)
+	- printf (from `<PrintfStatement>`)
 	- epsilon
 - Follow set
 	- {
@@ -98,7 +101,8 @@
 	- while
 	- return
 	- print
-	_ }
+	- printf
+	- }
 
 `<AssignOrFuncCall>`
 - First set
@@ -161,6 +165,7 @@
 	- return
 	- } 
 	- print
+	- printf
 
 `<WhileStatement>`
 - First set
@@ -174,6 +179,7 @@
 	- return
 	- } 
 	- print
+	- printf
 
 `<DeclareStatement>`
 - First set
@@ -284,6 +290,12 @@
 `<PrintStatement>`
 - First set
 	- print
+- Follow set
+	- ;
+
+`<PrintfStatement>`
+- First set
+	- printf
 - Follow set
 	- ;
 
