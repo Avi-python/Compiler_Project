@@ -1,12 +1,14 @@
 int a = 13;
 
-int helper(int x, int y)
+void helper(int x, int y)
 {
-    return x + y;
+    a = x * y;
 }
 
 int main()
 {
-    int result = helper(a, 5);
-    return result;
+    char c = 'abc';
+    helper(3, 10);
+    print(a);
+    return 0;
 }

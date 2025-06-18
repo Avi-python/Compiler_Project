@@ -129,6 +129,27 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
+    if (opts.verbose) 
+    {
+        if (result.ast_root) 
+        {
+            visualize_ast(result.ast_root, "ast_output.dot");
+            printf("AST visualization saved to: ast_output.dot\n");
+        }
+        
+        if (result.global_sym_table) 
+        {
+            FILE* symbol_table_logs_file = fopen("symbol_table_logs.txt", "w");
+            if (symbol_table_logs_file) 
+            {
+                fprintf(symbol_table_logs_file, "Global Symbol Table Root: %p\n", (void*)result.global_sym_table);
+                show_entire_symbol_tree(result.global_sym_table, symbol_table_logs_file);
+                fclose(symbol_table_logs_file);
+                printf("Symbol table saved to: symbol_table_logs.txt\n");
+            }
+        }
+    }
+
     // Perform semantic analysis
     int semantic_errors = 0;
     if (result.ast_root != NULL) 
@@ -204,28 +225,6 @@ int main(int argc, char **argv)
     }
 
     codegen_dispose();
-    
-    // Generate additional output files if verbose
-    if (opts.verbose) 
-    {
-        if (result.ast_root) 
-        {
-            visualize_ast(result.ast_root, "ast_output.dot");
-            printf("AST visualization saved to: ast_output.dot\n");
-        }
-        
-        if (result.global_sym_table) 
-        {
-            FILE* symbol_table_logs_file = fopen("symbol_table_logs.txt", "w");
-            if (symbol_table_logs_file) 
-            {
-                fprintf(symbol_table_logs_file, "Global Symbol Table Root: %p\n", (void*)result.global_sym_table);
-                show_entire_symbol_tree(result.global_sym_table, symbol_table_logs_file);
-                fclose(symbol_table_logs_file);
-                printf("Symbol table saved to: symbol_table_logs.txt\n");
-            }
-        }
-    }
     
     // Clean up
     free(output_filename);

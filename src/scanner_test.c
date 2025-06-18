@@ -37,7 +37,7 @@ const char* token_to_string(int token) {
     switch (token) {
         case IDENTIFIER: return "IDENTIFIER";
         case NUMBER:     return "NUMBER";
-        case CHAR:       return "CHAR";
+        case CHAR_LITERAL: return "CHAR_LITERAL";
         case PLUS:       return "PLUS";
         case MINUS:      return "MINUS";
         case MUL:        return "MUL";
@@ -97,6 +97,9 @@ int main(int argc, char **argv) {
                 break;
             case NUMBER:
                 printf("%-20d |\n", yylval.ival);
+                break;
+            case CHAR_LITERAL:
+                printf("'%c' (%d)          |\n", (char)yylval.ival, yylval.ival);
                 break;
             // For tokens that don't use yylval, yytext contains the matched string
             case PLUS:

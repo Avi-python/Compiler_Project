@@ -33,10 +33,12 @@
 #define COMMA          29
 #define VOID           30
 #define PRINT          31
+#define CHAR_LITERAL   32
 
 typedef union {
     int ival;
     char *sval;
+    char cval;
 } YYSTYPE;
 
 // Extern declaration for yylval, so scanner_test.c and parser.c can use it

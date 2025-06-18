@@ -582,20 +582,41 @@ static LLVMValueRef generate_node(ASTNode* node)
                         printf_func = LLVMAddFunction(llvm_module, "printf", printf_type);
                     }
                     
-                    // Create format string "%d\n" for integers - FIX: Use global string instead of BuildGlobalStringPtr
-                    LLVMValueRef format_str_global = LLVMGetNamedGlobal(llvm_module, "printf_fmt");
-                    if (!format_str_global) {
-                        // Create a global constant string
-                        LLVMValueRef fmt_string = LLVMConstStringInContext(llvm_context, "%d\n", 3, 0);
-                        format_str_global = LLVMAddGlobal(llvm_module, LLVMTypeOf(fmt_string), "printf_fmt");
-                        LLVMSetInitializer(format_str_global, fmt_string);
-                        LLVMSetLinkage(format_str_global, LLVMPrivateLinkage);
-                        LLVMSetGlobalConstant(format_str_global, 1);
-                    }
+                    // Determine format string based on expression type
+                    LLVMValueRef format_str;
+                    LLVMTypeRef expr_type = LLVMTypeOf(expr_val);
                     
-                    // Get pointer to the string
-                    LLVMValueRef format_str = LLVMBuildBitCast(llvm_builder, format_str_global, 
-                                                            LLVMPointerType(LLVMInt8TypeInContext(llvm_context), 0), "fmt_ptr");
+                    if (LLVMGetTypeKind(expr_type) == LLVMIntegerTypeKind && LLVMGetIntTypeWidth(expr_type) == 8) 
+                    {
+                        // It's a char (8-bit integer) - use %c format
+                        LLVMValueRef char_fmt_global = LLVMGetNamedGlobal(llvm_module, "printf_char_fmt");
+                        if (!char_fmt_global) {
+                            LLVMValueRef fmt_string = LLVMConstStringInContext(llvm_context, "%c", 2, 0);
+                            char_fmt_global = LLVMAddGlobal(llvm_module, LLVMTypeOf(fmt_string), "printf_char_fmt");
+                            LLVMSetInitializer(char_fmt_global, fmt_string);
+                            LLVMSetLinkage(char_fmt_global, LLVMPrivateLinkage);
+                            LLVMSetGlobalConstant(char_fmt_global, 1);
+                        }
+                        format_str = LLVMBuildBitCast(llvm_builder, char_fmt_global, 
+                                                    LLVMPointerType(LLVMInt8TypeInContext(llvm_context), 0), "char_fmt_ptr");
+                        
+                        // Extend char to int for printf (chars are promoted to int in variadic functions)
+                        expr_val = LLVMBuildSExt(llvm_builder, expr_val, LLVMInt32TypeInContext(llvm_context), "char_to_int");
+                    }
+                    else 
+                    {
+                        // Use %d format for integers
+                        LLVMValueRef int_fmt_global = LLVMGetNamedGlobal(llvm_module, "printf_int_fmt");
+                        if (!int_fmt_global) {
+                            LLVMValueRef fmt_string = LLVMConstStringInContext(llvm_context, "%d", 2, 0);
+                            int_fmt_global = LLVMAddGlobal(llvm_module, LLVMTypeOf(fmt_string), "printf_int_fmt");
+                            LLVMSetInitializer(int_fmt_global, fmt_string);
+                            LLVMSetLinkage(int_fmt_global, LLVMPrivateLinkage);
+                            LLVMSetGlobalConstant(int_fmt_global, 1);
+                        }
+                        format_str = LLVMBuildBitCast(llvm_builder, int_fmt_global, 
+                                                    LLVMPointerType(LLVMInt8TypeInContext(llvm_context), 0), "int_fmt_ptr");
+                    }
                     
                     // Call printf with format string and value
                     LLVMValueRef printf_args[] = {format_str, expr_val};
@@ -627,7 +648,31 @@ static LLVMValueRef generate_node(ASTNode* node)
                 if (decl_node->expression) 
                 {
                     LLVMValueRef init_val = generate_expression(decl_node->expression);
-                    if (init_val) LLVMBuildStore(llvm_builder, init_val, var_alloca);
+                    if (init_val) {
+                        LLVMTypeRef init_type = LLVMTypeOf(init_val);
+                        LLVMTypeRef target_type = llvm_type;
+                        
+                        // If types don't match, perform appropriate conversion
+                        if (LLVMGetTypeKind(init_type) == LLVMIntegerTypeKind && 
+                            LLVMGetTypeKind(target_type) == LLVMIntegerTypeKind) {
+                            
+                            unsigned init_width = LLVMGetIntTypeWidth(init_type);
+                            unsigned target_width = LLVMGetIntTypeWidth(target_type);
+                            
+                            if (init_width > target_width) 
+                            {
+                                // Truncate larger integer to smaller (e.g., i32 -> i8)
+                                init_val = LLVMBuildTrunc(llvm_builder, init_val, target_type, "trunc");
+                            } 
+                            else if (init_width < target_width) 
+                            {
+                                // Extend smaller integer to larger (e.g., i8 -> i32)
+                                init_val = LLVMBuildSExt(llvm_builder, init_val, target_type, "sext");
+                            }
+                        }
+                        
+                        LLVMBuildStore(llvm_builder, init_val, var_alloca);
+                    }
                 }
                 current_declarator_ast = current_declarator_ast->next;
             }
