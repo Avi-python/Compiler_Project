@@ -567,6 +567,39 @@ static LLVMValueRef generate_node(ASTNode* node)
             }
             return NULL; // Return is a control flow instruction
         }
+        case NODE_PRINT_STATEMENT:
+        {
+            PrintStatementNode* print_node = (PrintStatementNode*)node;
+            if (print_node->expression) 
+            {
+                LLVMValueRef expr_val = generate_expression(print_node->expression);
+                if (expr_val) 
+                {
+                    // Call printf to print the value
+                    // First, get or declare printf function
+                    LLVMValueRef printf_func = LLVMGetNamedFunction(llvm_module, "printf");
+                    if (!printf_func) 
+                    {
+                        // Declare printf function: int printf(char* format, ...)
+                        LLVMTypeRef printf_type = LLVMFunctionType(
+                            LLVMInt32TypeInContext(llvm_context), // return type: int
+                            (LLVMTypeRef[]){LLVMPointerType(LLVMInt8TypeInContext(llvm_context), 0)}, // char*
+                            1, // number of fixed parameters 
+                            1  // is variadic
+                        );
+                        printf_func = LLVMAddFunction(llvm_module, "printf", printf_type);
+                    }
+                    
+                    // Create format string "%d\n" for integers
+                    LLVMValueRef format_str = LLVMBuildGlobalStringPtr(llvm_builder, "%d\n", "fmt");
+                    
+                    // Call printf with format string and value
+                    LLVMValueRef printf_args[] = {format_str, expr_val};
+                    LLVMBuildCall2(llvm_builder, LLVMGlobalGetValueType(printf_func), printf_func, printf_args, 2, "");
+                }
+            }
+            return NULL;
+        }
         case NODE_NUMBER_LITERAL: 
         {
             NumberNode* num_node = (NumberNode*)node;

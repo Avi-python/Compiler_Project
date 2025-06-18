@@ -18,6 +18,7 @@ typedef enum {
     NODE_ASSIGNMENT_STATEMENT,
     NODE_BINARY_EXPRESSION,
     NODE_FUNCTION_CALL,
+    NODE_PRINT_STATEMENT,
     NODE_IDENTIFIER,
     NODE_NUMBER_LITERAL,
     NODE_TYPE,
@@ -114,6 +115,12 @@ typedef struct {
     ASTNode* expression;
 } AssignmentStatementNode;
 AssignmentStatementNode* create_assignment_statement_node(ASTNode* identifier, ASTNode* expression, int lineno, int colno);
+
+typedef struct {
+    ASTNode base;
+    ASTNode* expression;
+} PrintStatementNode;
+PrintStatementNode* create_print_statement_node(ASTNode* expression, int lineno, int colno);
 
 typedef struct {
     ASTNode base;

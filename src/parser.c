@@ -46,6 +46,7 @@ ASTNode* type();
 ASTNode* if_statement();
 ASTNode* while_statement();
 ASTNode* return_statement();
+ASTNode* print_statement();
 
 // --- Main Driver --- (This section will be replaced)
 
@@ -129,6 +130,7 @@ char* token_type_to_string(int token_type)
         case LT: return "LT";
         case GT: return "GT";
         case COMMA: return "COMMA";
+        case PRINT: return "PRINT";
         case EOF: return "EOF";
         default: 
             return "UNKNOWN";
@@ -523,7 +525,7 @@ ASTNode* compound_statement()
 
     if(!match(LBRACE))
     {
-        int follow_set[] = {EOF, IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE, ELSE, RETURN};
+        int follow_set[] = {EOF, IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE, ELSE, RETURN, PRINT};
         char error_msg[200];
         sprintf(error_msg, "Expected \'{\' to start compound statement, got %s", token_type_to_string(token));
         save_error_lexer_pos("syntax error", error_msg);
@@ -541,7 +543,7 @@ ASTNode* compound_statement()
     
     if(!match(RBRACE))
     {
-        int follow_set[] = {EOF, IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE, ELSE, RETURN};
+        int follow_set[] = {EOF, IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE, ELSE, RETURN, PRINT};
         char error_msg[200];
         sprintf(error_msg, "Expected \'}\' at end of compound statement, got %s",
                 token_type_to_string(token));
@@ -632,7 +634,7 @@ ASTNode* statement()
 {
     fprintf(log_file, "Parsing <Statement> (current token: %s, line: %d)\n", token_type_to_string(token), lineno);
 
-    int stmt_follow_set[] = {IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE, ELSE, RETURN};
+    int stmt_follow_set[] = {IDENTIFIER, LBRACE, INT, CHAR, VOID, IF, WHILE, RBRACE, ELSE, RETURN, PRINT};
     int stmt_follow_set_size = sizeof(stmt_follow_set)/sizeof(stmt_follow_set[0]);
     ASTNode* stmt_node = NULL;
 
@@ -700,6 +702,20 @@ ASTNode* statement()
             sprintf(error_msg, "Expected \';\' after return statement, got %s", token_type_to_string(token));
             save_error_lexer_pos("syntax error", error_msg);
             error_recovery(stmt_follow_set, stmt_follow_set_size, "statement_after_return");
+            free_ast(stmt_node);
+            return (ASTNode*)create_error_node(lineno, column);
+        }
+        return stmt_node;
+    }
+    if(token == PRINT) 
+    {
+        stmt_node = print_statement();
+        if(!match(SEMI)) 
+        {
+            char error_msg[200];
+            sprintf(error_msg, "Expected \';\' after print statement, got %s", token_type_to_string(token));
+            save_error_lexer_pos("syntax error", error_msg);
+            error_recovery(stmt_follow_set, stmt_follow_set_size, "statement_after_print");
             free_ast(stmt_node);
             return (ASTNode*)create_error_node(lineno, column);
         }
@@ -1312,6 +1328,39 @@ ASTNode* return_statement()
     }
 
     return (ASTNode*)create_return_statement_node(expr_node, l, c);
+}
+
+ASTNode* print_statement() 
+{
+    fprintf(log_file, "Parsing <PrintStatement> (current token: %s)\n", token_type_to_string(token));
+    int l = lineno;
+    int c = column;
+    match(PRINT);
+
+    if(!match(LPAREN)) 
+    {
+        int follow_set[] = {IDENTIFIER, NUMBER, LPAREN, SEMI}; 
+        char error_msg[200];
+        sprintf(error_msg, "Expected \'(\' after \'print\', got %s", token_type_to_string(token));
+        save_error_lexer_pos("syntax error", error_msg);
+        error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "print_statement_missing_lparen");
+        if (token != IDENTIFIER && token != NUMBER && token != LPAREN) return (ASTNode*)create_error_node(lineno, column);
+        if (token == LPAREN) match(LPAREN); else return (ASTNode*)create_error_node(lineno, column);
+    }
+    
+    ASTNode* expr_node = expression();
+
+    if(!match(RPAREN)) 
+    {
+        int follow_set[] = {SEMI}; 
+        char error_msg[200];
+        sprintf(error_msg, "Expected \')\' after \'print\' expression, got %s", token_type_to_string(token));
+        save_error_lexer_pos("syntax error", error_msg);
+        error_recovery(follow_set, sizeof(follow_set)/sizeof(follow_set[0]), "print_statement_missing_rparen");
+        if (token != SEMI) { free_ast(expr_node); return (ASTNode*)create_error_node(lineno, column); }
+    }
+
+    return (ASTNode*)create_print_statement_node(expr_node, l, c);
 }
 
 // --- Main Driver ---

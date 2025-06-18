@@ -32,6 +32,7 @@
 #define NE             28
 #define COMMA          29
 #define VOID           30
+#define PRINT          31
 
 typedef union {
     int ival;

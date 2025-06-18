@@ -48,6 +48,9 @@ void analyze_node(ASTNode* node, sym_t* symbol_table)
         case NODE_FUNCTION_CALL:
             analyze_function_call((FunctionCallNode*)node, symbol_table);
             break;
+        case NODE_PRINT_STATEMENT:
+            analyze_print_statement((PrintStatementNode*)node, symbol_table);
+            break;
         case NODE_RETURN_STATEMENT:
             analyze_return_statement((ReturnStatementNode*)node, symbol_table);
             break;
@@ -255,6 +258,34 @@ void analyze_return_statement(ReturnStatementNode* node, sym_t* symbol_table)
             save_error_details("semantic error", error_msg, node->base.lineno, node->base.colno, yyfilename);
             semantic_error_count++;
         }
+    }
+}
+
+void analyze_print_statement(PrintStatementNode* node, sym_t* symbol_table) 
+{
+    if (node->expression) 
+    {
+        // Check that the expression type is valid for printing (int or char)
+        int expr_type = get_node_type(node->expression, symbol_table);
+        
+        if (expr_type != INT && expr_type != CHAR) 
+        {
+            char error_msg[256];
+            sprintf(error_msg, "Print statement can only print int or char values, got %s",
+                    type_to_string(expr_type));
+            save_error_details("semantic error", error_msg, node->base.lineno, node->base.colno, yyfilename);
+            semantic_error_count++;
+        }
+        
+        // Analyze the expression for any nested semantic errors
+        analyze_node(node->expression, symbol_table);
+    }
+    else 
+    {
+        char error_msg[256];
+        sprintf(error_msg, "Print statement requires an expression to print");
+        save_error_details("semantic error", error_msg, node->base.lineno, node->base.colno, yyfilename);
+        semantic_error_count++;
     }
 }
 

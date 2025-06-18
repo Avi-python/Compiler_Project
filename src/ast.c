@@ -168,6 +168,19 @@ BinaryExpressionNode* create_binary_expression_node(int op, ASTNode* left, ASTNo
     return node;
 }
 
+PrintStatementNode* create_print_statement_node(ASTNode* expression, int lineno, int colno) {
+    PrintStatementNode* node = (PrintStatementNode*)malloc(sizeof(PrintStatementNode));
+    if (node == NULL) return NULL;
+    
+    node->base.type = NODE_PRINT_STATEMENT;
+    node->base.lineno = lineno;
+    node->base.colno = colno;
+    node->base.next = NULL;
+    node->base.root = NULL;
+    node->expression = expression;
+    return node;
+}
+
 FunctionCallNode* create_function_call_node(ASTNode* identifier, ASTNode* params, int lineno, int colno) {
     FunctionCallNode* node = (FunctionCallNode*)malloc(sizeof(FunctionCallNode));
     if (node == NULL) return NULL;
@@ -285,6 +298,9 @@ void free_ast(ASTNode* node) {
             free_ast(((AssignmentStatementNode*)node)->identifier);
             free_ast(((AssignmentStatementNode*)node)->expression);
             break;
+        case NODE_PRINT_STATEMENT:
+            free_ast(((PrintStatementNode*)node)->expression);
+            break;
         case NODE_BINARY_EXPRESSION:
             free_ast(((BinaryExpressionNode*)node)->left);
             free_ast(((BinaryExpressionNode*)node)->right);
@@ -368,6 +384,11 @@ void visualize_ast_recursive(ASTNode* node, FILE* fp) {
         case NODE_ASSIGNMENT_STATEMENT: {
             AssignmentStatementNode* asNode = (AssignmentStatementNode*)node;
             fprintf(fp, "AssignmentStatement");
+            break;
+        }
+        case NODE_PRINT_STATEMENT: {
+            PrintStatementNode* printNode = (PrintStatementNode*)node;
+            fprintf(fp, "PrintStatement");
             break;
         }
         case NODE_BINARY_EXPRESSION: {
@@ -538,6 +559,14 @@ void visualize_ast_recursive(ASTNode* node, FILE* fp) {
             if (asNode->expression) {
                 visualize_ast_recursive(asNode->expression, fp);
                 fprintf(fp, "  node%p -> node%p [label=\"expression\"];\n", (void*)node, (void*)asNode->expression);
+            }
+            break;
+        }
+        case NODE_PRINT_STATEMENT: {
+            PrintStatementNode* printNode = (PrintStatementNode*)node;
+            if (printNode->expression) {
+                visualize_ast_recursive(printNode->expression, fp);
+                fprintf(fp, "  node%p -> node%p [label=\"expression\"];\n", (void*)node, (void*)printNode->expression);
             }
             break;
         }

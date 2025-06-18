@@ -36,6 +36,7 @@ DRIVER_FILE = driver.c
 HASHTABLE_FILE = hashtable.c
 SYMBOL_TABLE_FILE = symbol_table.c
 CODEGEN_FILE = codegen.c
+SEMANTIC_FILE = semantic.c
 RESWORDS_GPERF_FILE = reswords.gperf
 
 # Generated files
@@ -51,7 +52,8 @@ HEADERS = \
 	$(INCLUDE_DIR)/hashtable.h \
 	$(INCLUDE_DIR)/error.h \
 	$(INCLUDE_DIR)/parser.h \
-	$(INCLUDE_DIR)/codegen.h
+	$(INCLUDE_DIR)/codegen.h \
+	$(INCLUDE_DIR)/semantic.h
 
 # Object files
 OBJS = \
@@ -62,6 +64,7 @@ OBJS = \
 	$(AST_FILE:.c=.obj) \
 	$(SYMBOL_FILE:.c=.obj) \
 	$(CODEGEN_FILE:.c=.obj) \
+	$(SEMANTIC_FILE:.c=.obj) \
 	lex.yy.obj
 
 # Default target

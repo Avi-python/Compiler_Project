@@ -24,6 +24,7 @@
                 | <IfStatement>
                 | <WhileStatement>
                 | <ReturnStatement> ;
+                | <PrintStatement> ;
                 | epsilon
 
 <AssignOrFuncCall> ::= <AssignmentStatement> | <FunctionCallStatement>
@@ -71,6 +72,8 @@
 <EpsilonOrFuncCall> ::= epsilon | <FunctionCallStatement>
 
 <ReturnStatement> ::= return [ <Expression> ]
+
+<PrintStatement> ::= print ( <ArgumentListOpt> )
 
 <Identifier> ::= <Alpha> { <Alpha> | <Digit> }
 

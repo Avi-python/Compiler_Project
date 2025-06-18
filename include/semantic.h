@@ -15,6 +15,7 @@ void analyze_variable_declaration(ASTNode* node, sym_t* symbol_table);
 void analyze_assignment(AssignmentStatementNode* node, sym_t* symbol_table);
 void analyze_function_call(FunctionCallNode* node, sym_t* symbol_table);
 void analyze_return_statement(ReturnStatementNode* node, sym_t* symbol_table);
+void analyze_print_statement(PrintStatementNode* node, sym_t* symbol_table);
 void analyze_binary_expression(BinaryExpressionNode* node, sym_t* symbol_table);
 void analyze_if_statement(IfStatementNode* node, sym_t* symbol_table);
 void analyze_while_statement(WhileStatementNode* node, sym_t* symbol_table);

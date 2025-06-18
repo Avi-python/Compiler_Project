@@ -64,37 +64,41 @@
 	- while ( from `<WhileStatement>` )
 	- return
 	- } 
+	- print
 	- else
 
 `<StatementList>`
 - First set
-	- Identifier
-	- { ( from `<CompoundStatement>` )
-	- int, char, void ( from `<DeclareStatement>` )
-	- if ( from `<IfStatement>` )
-	- while ( from `<WhileStatement>` )
-	- return ( from `<ReturnStatement>` ) 
+	- { (from `<CompoundStatement>`)
+	- int, char, void (from `<DeclareStatement>`)
+	- Identifier (from identifier statements)
+	- if (from `<IfStatement>`)
+	- while (from `<WhileStatement>`)
+	- return (from `<ReturnStatement>`)
+	- print (from `<PrintStatement>`) 
 	- epsilon
 - Follow set
 	- }
 
 `<Statement>`
 - First set
-	- Identifier
-	- { ( from `<CompoundStatement>` )
-	- int, char, void ( from `<DeclareStatement>` )
-	- if ( from `<IfStatement>` )
-	- while ( from `<WhileStatement>` )
-	- return ( from `<ReturnStatement>` )
+	- { (from `<CompoundStatement>`)
+	- int, char, void (from `<DeclareStatement>`)
+	- Identifier (from identifier statements)
+	- if (from `<IfStatement>`)
+	- while (from `<WhileStatement>`)
+	- return (from `<ReturnStatement>`)
+	- print (from `<PrintStatement>`)
 	- epsilon
 - Follow set
-	- Identifier
-	- { 
+	- {
 	- int, char, void
+	- Identifier
 	- if
 	- while
 	- return
-	- }
+	- print
+	_ }
 
 `<AssignOrFuncCall>`
 - First set
@@ -132,27 +136,44 @@
 - Follow set
 	- )
 
+`<InitDeclarator>`
+- First set
+	- Identifier
+- Follow set
+	- ,
+	- ;
+
+`<DeclareStatement>`
+- First set
+	- int, char, void
+- Follow set
+	- ;
+
 `<IfStatement>`
 - First set
 	- if
 - Follow set
-	- Identifier
-	- { 
-	- int, char, void
-	- if
-	- while
+	-  Identifier
+	- { ( from `<CompoundStatement>` )
+	- int, char, void ( from `<DeclareStatement>` )
+	- if ( from `<IfStatement>` )
+	- while ( from `<WhileStatement>` )
+	- return
 	- } 
+	- print
 
 `<WhileStatement>`
 - First set
 	- while
 - Follow set
-	- Identifier
-	- { 
-	- int, char, void
-	- if
-	- while
-	- }
+	-  Identifier
+	- { ( from `<CompoundStatement>` )
+	- int, char, void ( from `<DeclareStatement>` )
+	- if ( from `<IfStatement>` )
+	- while ( from `<WhileStatement>` )
+	- return
+	- } 
+	- print
 
 `<DeclareStatement>`
 - First set
@@ -254,6 +275,12 @@
 `<ReturnStatement>`
 - First set
 	- return
+- Follow set
+	- ;
+
+`<PrintStatement>`
+- First set
+	- print
 - Follow set
 	- ;
 
