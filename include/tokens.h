@@ -34,6 +34,8 @@
 #define VOID           30
 #define PRINT          31
 #define CHAR_LITERAL   32
+#define PRINTF         33
+#define STRING_LITERAL 34
 
 typedef union {
     int ival;

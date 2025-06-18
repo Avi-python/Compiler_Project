@@ -29,6 +29,7 @@ dig         [0-9]
 number      {dig}+
 identifier  {alpha}({alpha}|{dig}|_)*
 character   \'([^'\\]|\\.)\'
+string      \"([^"\\]|\\.)*\"
 invalid_char_literal \'([^'\\]|\\.)([^'\\]|\\.)+\'
 
 %%
@@ -108,6 +109,11 @@ invalid_char_literal \'([^'\\]|\\.)([^'\\]|\\.)+\'
     save_error_lexer_pos("lexical error", error_msg); column += yyleng; 
     yylval.ival = '\0';
     return CHAR_LITERAL; // Return null character to avoid further processing
+}
+{string}         { 
+    yylval.sval = strdup(yytext); 
+    column += yyleng; 
+    return STRING_LITERAL; 
 }
 
 .               { 

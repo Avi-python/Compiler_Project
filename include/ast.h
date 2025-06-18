@@ -19,8 +19,10 @@ typedef enum {
     NODE_BINARY_EXPRESSION,
     NODE_FUNCTION_CALL,
     NODE_PRINT_STATEMENT,
+    NODE_PRINTF_STATEMENT,
     NODE_IDENTIFIER,
     NODE_NUMBER_LITERAL,
+    NODE_STRING_LITERAL,
     NODE_TYPE,
     NODE_ERROR
 } ASTNodeType;
@@ -124,6 +126,13 @@ PrintStatementNode* create_print_statement_node(ASTNode* expression, int lineno,
 
 typedef struct {
     ASTNode base;
+    ASTNode* format_string;
+    ASTNode* arguments; // list of expressions
+} PrintfStatementNode;
+PrintfStatementNode* create_printf_statement_node(ASTNode* format_string, ASTNode* arguments, int lineno, int colno);
+
+typedef struct {
+    ASTNode base;
     ASTNode* identifier;
     ASTNode* params;
 } FunctionCallNode;
@@ -142,6 +151,12 @@ typedef struct {
     int value;
 } NumberNode;
 NumberNode* create_number_literal_node(int value, int lineno, int colno);
+
+typedef struct {
+    ASTNode base;
+    char* value;
+} StringLiteralNode;
+StringLiteralNode* create_string_literal_node(char* value, int lineno, int colno);
 
 typedef struct {
     ASTNode base;
