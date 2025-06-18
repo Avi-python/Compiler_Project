@@ -67,7 +67,7 @@
               | / <Factor> <TermPrime>
               | epsilon
 
-<Factor> ::= <Identifier> <EpsilonOrFuncCall> | <Number> | ( <Expression> )
+<Factor> ::= <Identifier> <EpsilonOrFuncCall> | <Number> | <CharLiteral> | ( <Expression> )
 
 <EpsilonOrFuncCall> ::= epsilon | <FunctionCallStatement>
 
@@ -78,6 +78,8 @@
 <Identifier> ::= <Alpha> { <Alpha> | <Digit> }
 
 <Number> ::= <Digit> { <Digit> }                    
+
+<CharLiteral> ::= ' <Alpha> '
 
 <Type> ::= int | char | void
 

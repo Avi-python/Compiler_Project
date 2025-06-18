@@ -125,14 +125,14 @@
 
 `<ArgumentListOpt>`
 - First set
-	- Identifier, Number, ( ( from `<Expression>` )
+	- CharLiteral, Identifier, Number, ( ( from `<Expression>` )
 	- epsilon
 - Follow set
 	- )
 
 `<ArgumentList>`
 - First set
-	- Identifier, Number, ( ( from `<Expression>` )
+	- CharLiteral, Identifier, Number, ( ( from `<Expression>` )
 - Follow set
 	- )
 
@@ -193,6 +193,7 @@
 	- Identifier 
     - (
     - Number
+	- CharLiteral
 - Follow set
 	- )
 	- ;
@@ -233,6 +234,7 @@
 	- Identifier 
     - Number
     - (
+	- CharLiteral
 - Follow set
 	- +, -
 	- ), ;
@@ -254,6 +256,7 @@
 	- Identifier
 	- Number 
 	- (
+	- CharLiteral
 - Follow set
 	- \*, /
 	- +, -

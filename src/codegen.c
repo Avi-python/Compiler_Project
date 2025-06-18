@@ -162,6 +162,43 @@ static LLVMValueRef generate_statement(ASTNode* stmt_node);
 static LLVMValueRef generate_node(ASTNode* node);
 static int current_block_needs_terminator();
 
+// Helper function to convert argument types for function calls
+static LLVMValueRef convert_argument_type(LLVMValueRef arg_value, LLVMTypeRef target_type, const char* arg_name) 
+{
+    if (!arg_value || !target_type) return arg_value;
+    
+    LLVMTypeRef arg_type = LLVMTypeOf(arg_value);
+    
+    // If types match exactly, no conversion needed
+    if (LLVMGetTypeKind(arg_type) == LLVMGetTypeKind(target_type) &&
+        LLVMGetIntTypeWidth(arg_type) == LLVMGetIntTypeWidth(target_type)) {
+        return arg_value;
+    }
+    
+    // Handle integer type conversions
+    if (LLVMGetTypeKind(arg_type) == LLVMIntegerTypeKind && 
+        LLVMGetTypeKind(target_type) == LLVMIntegerTypeKind) {
+        
+        unsigned arg_width = LLVMGetIntTypeWidth(arg_type);
+        unsigned target_width = LLVMGetIntTypeWidth(target_type);
+        
+        if (arg_width > target_width) {
+            // Truncate (e.g., i32 -> i8 for char parameters)
+            printf("CodeGen Debug: Truncating argument '%s' from i%u to i%u\n", 
+                   arg_name ? arg_name : "unknown", arg_width, target_width);
+            return LLVMBuildTrunc(llvm_builder, arg_value, target_type, "arg_trunc");
+        } 
+        else if (arg_width < target_width) {
+            // Sign extend (e.g., i8 -> i32)
+            printf("CodeGen Debug: Sign-extending argument '%s' from i%u to i%u\n", 
+                   arg_name ? arg_name : "unknown", arg_width, target_width);
+            return LLVMBuildSExt(llvm_builder, arg_value, target_type, "arg_sext");
+        }
+    }
+    
+    // If no conversion is possible or needed, return original value
+    return arg_value;
+}
 
 void codegen_init(const char* output_filename) 
 {
@@ -711,7 +748,22 @@ static LLVMValueRef generate_node(ASTNode* node)
             }
 
             LLVMValueRef expr_val = generate_expression(assign_node->expression);
-            if (expr_val) LLVMBuildStore(llvm_builder, expr_val, var_ref);
+            if (expr_val) {
+                // Get the target variable's type for proper conversion
+                LLVMTypeRef target_type;
+                if (LLVMGetInstructionOpcode(var_ref) == LLVMAlloca) {
+                    // Local variable - get allocated type
+                    target_type = LLVMGetAllocatedType(var_ref);
+                } else {
+                    // Global variable - get element type
+                    target_type = LLVMGetElementType(LLVMTypeOf(var_ref));
+                }
+                
+                // Convert expression value to match target type if needed
+                expr_val = convert_argument_type(expr_val, target_type, id_node->symbol->name);
+                
+                LLVMBuildStore(llvm_builder, expr_val, var_ref);
+            }
             return expr_val; // Assignment can be an expression in C
         }
         case NODE_BINARY_EXPRESSION: 
@@ -842,20 +894,60 @@ static LLVMValueRef generate_node(ASTNode* node)
                 arg_ast_count = arg_ast_count->next; // Assuming params are a linked list of expression nodes
             }
 
+            // Get function type and parameter types
+            LLVMTypeRef func_type = LLVMGlobalGetValueType(func_to_call);
+            LLVMTypeRef func_return_type = LLVMGetReturnType(func_type);
+            
+            // Check parameter count
+
+            unsigned expected_param_count = LLVMCountParamTypes(func_type);
+            if (arg_count != expected_param_count) {
+                fprintf(stderr, "CodeGen Error: Function %s expects %u parameters, but %d arguments provided\n", 
+                        func_name_node->symbol->name, expected_param_count, arg_count);
+                return NULL;
+            }
+
+            // Get the actual parameter types from the function signature
+            LLVMTypeRef* param_types = NULL;
+            if (arg_count > 0) {
+                param_types = malloc(sizeof(LLVMTypeRef) * arg_count);
+                LLVMGetParamTypes(func_type, param_types);
+            }
+
+            // Generate argument expressions and convert types as needed
             LLVMValueRef* args = malloc(sizeof(LLVMValueRef) * arg_count);
             ASTNode* current_arg_ast = call_node->params;
             for (int i = 0; i < arg_count; ++i) 
             {
-                args[i] = generate_expression(current_arg_ast); // Each param is an expression
-                if (!args[i]) {
+                LLVMValueRef arg_val = generate_expression(current_arg_ast);
+                if (!arg_val) {
                     free(args);
+                    if (param_types) free(param_types);
                     return NULL; // Error in argument generation
                 }
+                
+                // Convert argument type to match parameter type
+                if (param_types) {
+                    char param_name[64];
+                    snprintf(param_name, sizeof(param_name), "arg%d", i);
+                    args[i] = convert_argument_type(arg_val, param_types[i], param_name);
+                    
+                    // Debug: Print type conversion info
+                    LLVMTypeRef arg_type = LLVMTypeOf(arg_val);
+                    LLVMTypeRef param_type = param_types[i];
+                    if (LLVMGetTypeKind(arg_type) == LLVMIntegerTypeKind && 
+                        LLVMGetTypeKind(param_type) == LLVMIntegerTypeKind) {
+                        unsigned arg_width = LLVMGetIntTypeWidth(arg_type);
+                        unsigned param_width = LLVMGetIntTypeWidth(param_type);
+                        printf("CodeGen Debug: Function %s param %d: converting i%u to i%u\n", 
+                               func_name_node->symbol->name, i, arg_width, param_width);
+                    }
+                } else {
+                    args[i] = arg_val;
+                }
+                
                 current_arg_ast = current_arg_ast->next;
             }
-
-            LLVMTypeRef func_type = LLVMGlobalGetValueType(func_to_call);
-            LLVMTypeRef func_return_type = LLVMGetReturnType(func_type); // Get function's declared return type
 
             const char *call_name = "";
             if (LLVMGetTypeKind(func_return_type) != LLVMVoidTypeKind) 
@@ -864,7 +956,10 @@ static LLVMValueRef generate_node(ASTNode* node)
             }
 
             LLVMValueRef call_val = LLVMBuildCall2(llvm_builder, func_type, func_to_call, args, arg_count, call_name);
+
+            // Clean up allocated memory
             free(args);
+            if (param_types) free(param_types);
             return call_val;
         }
         case NODE_GLOBAL_VARIABLE_DECLARATION: 
